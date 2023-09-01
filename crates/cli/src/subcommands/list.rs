@@ -3,8 +3,10 @@ use anyhow::Context;
 use clap::{Arg, ArgMatches, Command};
 use reqwest::StatusCode;
 use serde::Deserialize;
-use tabled::object::Columns;
-use tabled::{Alignment, Modify, Style, Table, Tabled};
+use tabled::{
+    settings::{object::Columns, Alignment, Modify, Style},
+    Table, Tabled,
+};
 
 pub fn cli() -> Command {
     Command::new("list")
@@ -71,7 +73,8 @@ pub async fn exec(config: Config, args: &ArgMatches) -> Result<(), anyhow::Error
         .collect::<Vec<_>>();
 
     if !result_list.is_empty() {
-        let table = Table::new(result_list)
+        let mut table = Table::new(result_list);
+        table
             .with(Style::psql())
             .with(Modify::new(Columns::first()).with(Alignment::left()));
         println!("Associated database addresses for {}:\n", identity);
