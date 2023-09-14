@@ -8,7 +8,7 @@ use itertools::Either;
 use serde_json::Value;
 use spacetimedb_lib::de::serde::deserialize_from;
 use spacetimedb_lib::sats::{AlgebraicTypeRef, Typespace};
-use spacetimedb_lib::ProductTypeElement;
+use spacetimedb_lib::{Address, ProductTypeElement};
 use std::fmt::Write;
 use std::iter;
 
@@ -71,7 +71,7 @@ pub async fn exec(mut config: Config, args: &ArgMatches) -> Result<(), Error> {
         address,
         reducer_name
     ));
-    let auth_header = get_auth_header_only(&mut config, anon_identity, as_identity, server).await;
+    let auth_header = get_auth_header_only(&mut config, anon_identity, as_identity, server).await?;
     let builder = add_auth_header_opt(builder, &auth_header);
 
     let res = builder.body(arg_json.to_owned()).send().await?;
@@ -110,7 +110,7 @@ pub async fn exec(mut config: Config, args: &ArgMatches) -> Result<(), Error> {
 /// Returns an error message for when `reducer` is called with wrong arguments.
 async fn invalid_arguments(
     config: Config,
-    addr: &str,
+    addr: &Address,
     db: &str,
     auth_header: &Option<String>,
     reducer: &str,
@@ -193,7 +193,7 @@ fn reducer_signature(schema_json: Value, reducer_name: &str) -> Option<String> {
 /// Returns an error message for when `reducer` does not exist in `db`.
 async fn no_such_reducer(
     config: Config,
-    addr: &str,
+    addr: &Address,
     db: &str,
     auth_header: &Option<String>,
     reducer: &str,
@@ -255,7 +255,7 @@ fn add_reducer_ctx_to_err(error: &mut String, schema_json: Value, reducer_name: 
 /// The value of `expand` determines how detailed information to fetch.
 async fn schema_json(
     config: Config,
-    address: &str,
+    address: &Address,
     auth_header: &Option<String>,
     expand: bool,
     server: Option<&str>,

@@ -352,8 +352,8 @@ pub async fn info(
         HostType::Wasmer => "wasmer",
     };
     let response_json = json!({
-        "address": database.address.to_hex(),
-        "identity": database.identity.to_hex(),
+        "address": database.address,
+        "identity": database.identity,
         "host_type": host_type,
         "num_replicas": database.num_replicas,
         "program_bytes_address": database.program_bytes_address,
@@ -571,10 +571,7 @@ pub async fn dns(
     let domain = database_name.parse().map_err(DomainParsingRejection)?;
     let address = ctx.control_db().spacetime_dns(&domain).await.map_err(log_and_500)?;
     let response = if let Some(address) = address {
-        DnsLookupResponse::Success {
-            domain,
-            address: address.to_hex(),
-        }
+        DnsLookupResponse::Success { domain, address }
     } else {
         DnsLookupResponse::Failure { domain }
     };
@@ -662,7 +659,7 @@ pub async fn request_recovery_code(
     let recovery_code = RecoveryCode {
         code: code.clone(),
         generation_time: Utc::now(),
-        identity: identity.to_hex(),
+        identity,
     };
     ctx.control_db()
         .spacetime_insert_recovery_code(email.as_str(), recovery_code)
@@ -705,7 +702,7 @@ pub async fn confirm_recovery_code(
     }
 
     // Make sure the identity provided by the request matches the recovery code registration
-    if recovery_code.identity != identity.to_hex() {
+    if recovery_code.identity != identity {
         return Err((
             StatusCode::BAD_REQUEST,
             "Recovery code doesn't match the provided identity.",
@@ -726,10 +723,7 @@ pub async fn confirm_recovery_code(
 
     // Recovery code is verified, return the identity and token to the user
     let token = encode_token(ctx.private_key(), identity).map_err(log_and_500)?;
-    let result = RecoveryCodeResponse {
-        identity: identity.to_hex(),
-        token,
-    };
+    let result = RecoveryCodeResponse { identity, token };
 
     Ok(axum::Json(result))
 }
@@ -891,7 +885,7 @@ pub async fn publish(
             NameOrAddress::Address(_) => None,
             NameOrAddress::Name(name) => Some(name),
         }),
-        address: db_address.to_hex(),
+        address: db_address,
         op,
     };
 

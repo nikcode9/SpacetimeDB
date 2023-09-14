@@ -72,7 +72,7 @@ pub enum NameOrAddress {
 impl NameOrAddress {
     pub fn into_string(self) -> String {
         match self {
-            NameOrAddress::Address(addr) => addr.to_hex(),
+            NameOrAddress::Address(addr) => addr.to_hex().to_string(),
             NameOrAddress::Name(name) => name,
         }
     }

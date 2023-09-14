@@ -11,7 +11,7 @@ pub use jsonwebtoken::{DecodingKey, EncodingKey};
 #[serde_with::serde_as]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SpacetimeIdentityClaims {
-    pub hex_identity: String,
+    pub hex_identity: Identity,
     #[serde_as(as = "serde_with::TimestampSeconds")]
     pub iat: SystemTime,
     pub exp: Option<u64>,
@@ -39,7 +39,7 @@ pub fn encode_token_with_expiry(
     });
 
     let claims = SpacetimeIdentityClaims {
-        hex_identity: identity.to_hex(),
+        hex_identity: identity,
         iat: SystemTime::now(),
         exp: expiry,
     };

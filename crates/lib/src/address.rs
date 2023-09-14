@@ -4,6 +4,7 @@ use anyhow::Context as _;
 use hex::FromHex as _;
 use sats::{impl_deserialize, impl_serialize, impl_st};
 
+use crate::hex::HexString;
 use crate::sats;
 
 /// This is the address for a SpacetimeDB database. It is a unique identifier
@@ -17,13 +18,11 @@ pub struct Address(u128);
 
 impl Display for Address {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.to_hex())
+        f.pad(&self.to_hex())
     }
 }
 
 impl Address {
-    const ABBREVIATION_LEN: usize = 16;
-
     pub fn from_arr(arr: &[u8; 16]) -> Self {
         Self(u128::from_be_bytes(*arr))
     }
@@ -39,12 +38,16 @@ impl Address {
             .map(Self)
     }
 
-    pub fn to_hex(self) -> String {
-        hex::encode(self.as_slice())
+    pub fn to_hex(self) -> HexString<16> {
+        crate::hex::encode(&self.as_slice())
     }
 
-    pub fn to_abbreviated_hex(self) -> String {
-        self.to_hex()[0..Self::ABBREVIATION_LEN].to_owned()
+    pub fn abbreviate(&self) -> [u8; 8] {
+        self.as_slice()[..8].try_into().unwrap()
+    }
+
+    pub fn to_abbreviated_hex(self) -> HexString<8> {
+        crate::hex::encode(&self.abbreviate())
     }
 
     pub fn from_slice(slice: impl AsRef<[u8]>) -> Self {
@@ -77,7 +80,7 @@ impl serde::Serialize for Address {
     where
         S: serde::Serializer,
     {
-        self.to_hex().serialize(serializer)
+        spacetimedb_sats::ser::serde::serialize_to(&self.as_slice(), serializer)
     }
 }
 
@@ -87,8 +90,8 @@ impl<'de> serde::Deserialize<'de> for Address {
     where
         D: serde::Deserializer<'de>,
     {
-        let s = String::deserialize(deserializer)?;
-        Address::from_hex(&s).map_err(serde::de::Error::custom)
+        let arr = spacetimedb_sats::de::serde::deserialize_from(deserializer)?;
+        Ok(Address::from_arr(&arr))
     }
 }
 
