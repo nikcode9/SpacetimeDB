@@ -7,6 +7,7 @@ pub mod builtin_type;
 pub mod builtin_value;
 pub mod convert;
 pub mod de;
+pub mod flat;
 pub mod meta_type;
 pub mod product_type;
 pub mod product_type_element;
