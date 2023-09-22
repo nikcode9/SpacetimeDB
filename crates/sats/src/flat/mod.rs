@@ -55,6 +55,7 @@ impl FixedSizeOf for AlgebraicType {
             // We store at most 32 bytes inline.
             // Longer strings are put in variable storage.
             &Self::String => 32 * size_of::<u8>(),
+            // TODO: Content address?
             Self::Builtin(BuiltinType::Array(ty)) => ty.elem_ty.fixed_size_of() * 32,
             Self::Builtin(BuiltinType::Map(ty)) => ty.fixed_size_of(),
         }
@@ -87,7 +88,7 @@ impl FixedSizeOf for ProductType {
 
 impl FixedSizeOf for MapType {
     fn fixed_size_of(&self) -> usize {
-        todo!()
+        (self.key_ty.fixed_size_of() + self.ty.fixed_size_of()) * 32
     }
 }
 
@@ -112,7 +113,6 @@ pub trait SerializeFlat {
 
 pub struct FlatAlgebraicValue<'a> {
     buffer: FlatBuffer<'a>,
-    vars: MyVars<'a>,
 }
 
 impl FlatAlgebraicValue<'_> {
@@ -144,7 +144,11 @@ impl FlatAlgebraicValue<'_> {
             &AlgebraicType::U128 => (16, self.as_u128_unchecked().into()),
             &AlgebraicType::F32 => (4, self.as_f32_unchecked().into()),
             &AlgebraicType::F64 => (8, self.as_f64_unchecked().into()),
-            &AlgebraicType::String => todo!(),
+            &AlgebraicType::String => {
+                unsafe {
+                    self.buffer as usize as *const u8;
+                }
+            }
             AlgebraicType::Builtin(Array(_)) => todo!(),
             AlgebraicType::Builtin(Map(_)) => todo!(),
         }
