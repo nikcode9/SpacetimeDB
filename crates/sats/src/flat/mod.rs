@@ -11,6 +11,8 @@ use crate::SumTypeVariant;
 use crate::SumValue;
 use core::mem::size_of;
 
+pub mod page;
+
 /// Returns the first `N` elements of the slice, or `None` if it has fewer than `N` elements.
 pub const fn first_chunk<T, const N: usize>(slice: &[T]) -> Option<&[T; N]> {
     // Implementation borrowed from standard library, see `<slice>::first_chunk`.
@@ -144,11 +146,7 @@ impl FlatAlgebraicValue<'_> {
             &AlgebraicType::U128 => (16, self.as_u128_unchecked().into()),
             &AlgebraicType::F32 => (4, self.as_f32_unchecked().into()),
             &AlgebraicType::F64 => (8, self.as_f64_unchecked().into()),
-            &AlgebraicType::String => {
-                unsafe {
-                    self.buffer as usize as *const u8;
-                }
-            }
+            &AlgebraicType::String => todo!(),
             AlgebraicType::Builtin(Array(_)) => todo!(),
             AlgebraicType::Builtin(Map(_)) => todo!(),
         }
@@ -212,6 +210,7 @@ impl SerializeFlat for AlgebraicValue {
 
     fn serialize<'a>(&self, buffer: &'a mut Buffer) -> Self::FlatValue<'a> {
         let start = buffer.len();
+        dbg!(start);
 
         use BuiltinValue::*;
         match self {
@@ -238,6 +237,8 @@ impl SerializeFlat for AlgebraicValue {
             Self::Builtin(Array { val: v }) => (),
             Self::Builtin(Map { val: v }) => (),
         }
+
+        dbg!(buffer.len());
 
         Self::FlatValue {
             buffer: &buffer[start..buffer.len()],
@@ -296,6 +297,14 @@ pub struct FlatProductValue<'a> {
 }
 
 impl FlatProductValue<'_> {
+    pub fn get_element(&self, ty: &ProductType, index: usize) -> FlatAlgebraicValue<'_> {
+        let tys = &ty.elements;
+        let elem_size = tys[index].fixed_size_of();
+        let offset = tys[..index].iter().map(<_>::fixed_size_of).sum::<usize>();
+        let buffer = &self.buffer[offset..offset + elem_size];
+        FlatAlgebraicValue { buffer }
+    }
+
     /// Returns a traditional un-flattened product value.
     pub fn nest(&self, ty: &ProductType) -> (usize, ProductValue) {
         let mut buffer = self.buffer;
@@ -321,10 +330,13 @@ impl SerializeFlat for ProductValue {
 
     fn serialize<'a>(&self, buffer: &'a mut Buffer) -> Self::FlatValue<'a> {
         let start = buffer.len();
+        dbg!(start);
 
         for elem in &self.elements {
             elem.serialize(buffer);
         }
+
+        dbg!(buffer.len());
 
         Self::FlatValue {
             buffer: &buffer[start..buffer.len()],

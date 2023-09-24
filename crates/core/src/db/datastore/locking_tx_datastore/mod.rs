@@ -1949,15 +1949,6 @@ impl TxDatastore for Locking {
     ) -> super::Result<Self::IterByColEq<'a>> {
         self.iter_by_col_eq_mut_tx(tx, table_id, col_id, value)
     }
-
-    fn get_tx<'a>(
-        &'a self,
-        tx: &'a Self::TxId,
-        table_id: TableId,
-        row_id: Self::RowId,
-    ) -> super::Result<Option<Self::DataRef>> {
-        self.get_mut_tx(tx, table_id, row_id)
-    }
 }
 
 impl traits::MutTx for Locking {
@@ -2087,24 +2078,6 @@ impl MutTxDatastore for Locking {
         value: AlgebraicValue,
     ) -> super::Result<Self::IterByColEq<'a>> {
         tx.lock.iter_by_col_eq(&table_id, &col_id, value)
-    }
-
-    fn get_mut_tx<'a>(
-        &'a self,
-        tx: &'a Self::MutTxId,
-        table_id: TableId,
-        row_id: Self::RowId,
-    ) -> super::Result<Option<Self::DataRef>> {
-        tx.lock.get(&table_id, &row_id)
-    }
-
-    fn delete_mut_tx<'a>(
-        &'a self,
-        tx: &'a mut Self::MutTxId,
-        table_id: TableId,
-        row_id: Self::RowId,
-    ) -> super::Result<bool> {
-        tx.lock.delete(&table_id, &row_id)
     }
 
     fn delete_by_rel_mut_tx<R: IntoIterator<Item = spacetimedb_sats::ProductValue>>(

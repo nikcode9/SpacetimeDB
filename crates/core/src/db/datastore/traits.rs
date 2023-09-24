@@ -447,13 +447,6 @@ pub trait TxDatastore: DataRow + Tx {
         col_id: ColId,
         value: AlgebraicValue,
     ) -> Result<Self::IterByColEq<'a>>;
-
-    fn get_tx<'a>(
-        &'a self,
-        tx: &'a Self::TxId,
-        table_id: TableId,
-        row_id: Self::RowId,
-    ) -> Result<Option<Self::DataRef>>;
 }
 
 pub trait MutTxDatastore: TxDatastore + MutTx {
@@ -514,13 +507,6 @@ pub trait MutTxDatastore: TxDatastore + MutTx {
         col_id: ColId,
         value: AlgebraicValue,
     ) -> Result<Self::IterByColEq<'a>>;
-    fn get_mut_tx<'a>(
-        &'a self,
-        tx: &'a Self::MutTxId,
-        table_id: TableId,
-        row_id: Self::RowId,
-    ) -> Result<Option<Self::DataRef>>;
-    fn delete_mut_tx<'a>(&'a self, tx: &'a mut Self::MutTxId, table_id: TableId, row_id: Self::RowId) -> Result<bool>;
     fn delete_by_rel_mut_tx<R: IntoIterator<Item = ProductValue>>(
         &self,
         tx: &mut Self::MutTxId,
