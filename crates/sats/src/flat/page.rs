@@ -1,7 +1,3 @@
-use std::collections::{BTreeMap, HashMap};
-
-use crate::ProductType;
-
 use super::FlatProductValue;
 
 pub const PAGE_SIZE: usize = 16 * 1024;
@@ -15,7 +11,8 @@ pub struct Page {
 #[derive(Debug)]
 pub struct WriteError;
 
-pub struct RowIndex(usize);
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct RowIndex(u16);
 
 impl Page {
     pub fn new(row_size: usize) -> Self {
@@ -47,7 +44,7 @@ impl Page {
         self.buffer[start..start + size].copy_from_slice(bytes);
         self.num_rows += 1;
 
-        Ok(RowIndex(self.num_rows - 1))
+        Ok(RowIndex((self.num_rows - 1) as u16))
     }
 
     // NOTE: This function is possible because we store rows contigously.
@@ -55,89 +52,11 @@ impl Page {
     // with all values of a particular column contigously,
     // we could only provide a "cell" API.
     pub fn read(&self, index: RowIndex) -> FlatProductValue<'_> {
-        let start = index.0 * self.row_size;
+        let start = index.0 as usize * self.row_size;
         let buffer = &self.buffer[start..start + self.row_size];
         FlatProductValue { buffer }
     }
 }
-
-struct RowOffset {
-    which_page: u16,
-    offset_in_page: u16,
-}
-
-struct RowHash(u64);
-
-/*
-#[derive(Copy, Clone)]
-#[repr(packed)]
-struct Heap<T> {
-    ptr: NonNull<T>,
-    len: u8,
-}
-
-union SmallVecData<T, const N: usize> {
-    inline: ManuallyDrop<MaybeUninit<[T; N]>>,
-    heap: ManuallyDrop<Heap<T>>,
-}
-
-#[repr(packed)]
-#[derive(Copy, Clone)]
-struct RowOffset {
-    which_page: u32,
-    offset_in_page: u16,
-}
-
-#[derive(Copy, Clone)]
-union Foobar {
-    collider_idx: u32,
-    offset: RowOffset,
-}
-*/
-
-pub(crate) struct Table {
-    row_type: ProductType,
-    pages: Vec<Page>,
-    colliders: Vec<SmallVec<RowOffset>,
-    offset_map: HashMap<RowHash, Foobar>,
-    //pub(crate) rows: BTreeMap<RowId, ProductValue>,
-}
-
-
-
-/*
-fm contains(table, fpv) -> bool {
-    let row_hash = hash_of(fpv);
-    match table.offset_map.get(row_hash) {
-        None => false, // wohoo!
-        Some(offset) if pages[offset] == fpv => true,
-        Some(_) => false,
-    }
-}
-
-fn insert(table, fpv) -> Option<RowOffset> {
-    if contains(table, fpv) {
-        return None;
-    }
-
-    let row_hash = hash_of(fpv);
-    table.offset_map.insert(row_hash, )
-
-    table.write(fpv)
-}
-
-fn delete_fpv(table, fpv) -> bool {
-    let row_hash = hash_of(fpv);
-    if contains(table, fpv) {
-        table.offset_map.remove(row_hash);
-    }
-}
-
-fn delete(table, row_hash, row_offset) -> bool {
-    table.pages.delete(row_offset)
-    table.offset_map.remove(row_hash)
-}
-*/
 
 #[cfg(test)]
 mod tests {
