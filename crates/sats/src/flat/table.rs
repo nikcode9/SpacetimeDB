@@ -9,7 +9,16 @@ use crate::ProductType;
 
 /// The content hash of a row.
 ///
-/// Uses fxhash for fast hashing.
+/// Notes:
+/// - The hash is not cryptographically secure.
+///
+/// - The hash is valid only for the lifetime of a `Table`.
+///   This entails that it should not be persisted to disk
+///   or used as a stable identifier over the network.
+///   For example, the hashing algorithm could be different
+///   on different machines based on availability of hardware instructions.
+///   Moreover, due to random seeds, when restarting from disk,
+///   the hashes may be different for the same rows.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RowHash(u64);
 
