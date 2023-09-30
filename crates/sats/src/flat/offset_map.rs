@@ -1,7 +1,8 @@
 use nohash_hasher::IntMap;
-use std::{collections::hash_map::Entry, slice::from_ref};
+use std::{collections::hash_map::Entry, slice};
 
-use super::table::{RowHash, RowOffset};
+use super::raw_page::BufferOffset;
+use super::table::RowHash;
 use OffsetOrCollider::*;
 
 /// An index to the outer layer of `colliders` in `OffsetMap`.
@@ -26,7 +27,7 @@ impl ColliderSlotIndex {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum OffsetOrCollider {
     /// No row hash collisions; this is the only row offset for the hash.
-    Offset(RowOffset),
+    Offset(BufferOffset),
     /// There are row hash collisions; there are many row offsets for this hash.
     Collider(ColliderSlotIndex),
 }
@@ -48,7 +49,7 @@ pub struct OffsetMap {
     /// the index is added to `emptied_collider_slots` and it can be reused.
     /// This is done to avoid a linear scan of `colliders` for the first empty slot.
     // TODO(centril): Use a `SatsBuffer<T>` with `len/capacity: u32` to reduce size.
-    colliders: Vec<Vec<RowOffset>>,
+    colliders: Vec<Vec<BufferOffset>>,
     /// Stack of emptied collider slots.
     // TODO(centril): Use a `SatsBuffer<T>` with `len/capacity: u32` to reduce size.
     emptied_collider_slots: Vec<ColliderSlotIndex>,
@@ -56,18 +57,27 @@ pub struct OffsetMap {
 
 impl OffsetMap {
     /// Returns the row offsets associated with the given row `hash`.
-    pub fn offsets_for(&self, hash: RowHash) -> &[RowOffset] {
+    pub fn offsets_for(&self, hash: RowHash) -> &[BufferOffset] {
         match self.offset_map.get(&hash) {
             None => &[],
-            Some(Offset(ro)) => from_ref(ro),
+            Some(Offset(ro)) => slice::from_ref(ro),
             Some(Collider(ci)) => &self.colliders[ci.idx()],
+        }
+    }
+
+    /// Returns the row offsets associated with the given row `hash`.
+    pub fn offsets_for_mut(&mut self, hash: RowHash) -> &mut [BufferOffset] {
+        match self.offset_map.get_mut(&hash) {
+            None => &mut [],
+            Some(Offset(ro)) => slice::from_mut(ro),
+            Some(Collider(ci)) => &mut self.colliders[ci.idx()],
         }
     }
 
     /// Associates row `hash` with row `offset`.
     ///
     /// Handles any hash conflicts for `hash`.
-    pub fn insert(&mut self, hash: RowHash, offset: RowOffset) {
+    pub fn insert(&mut self, hash: RowHash, offset: BufferOffset) {
         self.offset_map
             .entry(hash)
             .and_modify(|v| match *v {
@@ -96,21 +106,21 @@ impl OffsetMap {
 
     /// Removes the association `hash -> offset`.
     ///
-    /// When an association doesn't exist, this does nothing.
-    pub fn remove(&mut self, hash: RowHash, offset: RowOffset) {
+    /// Returns whether the association was deleted.
+    pub fn remove(&mut self, hash: RowHash, offset: BufferOffset) -> bool {
         let Entry::Occupied(mut entry) = self.offset_map.entry(hash) else {
-            return;
+            return false;
         };
 
         match *entry.get() {
             // Remove entry on `hash -> [offset]`.
             Offset(o) if o == offset => drop(entry.remove()),
-            Offset(_) => {}
+            Offset(_) => return false,
             Collider(ci) => {
                 // Find `offset` in slot and remove.
                 let slot = &mut self.colliders[ci.idx()];
                 let Some(idx) = slot.iter().position(|o| *o == offset) else {
-                    return;
+                    return false;
                 };
                 slot.swap_remove(idx);
 
@@ -119,12 +129,14 @@ impl OffsetMap {
                     0 => drop(entry.remove()),
                     // Simplify; don't use collider list since `hash -> [an_offset]`.
                     1 => *entry.get_mut() = Offset(slot.pop().unwrap()),
-                    _ => return,
+                    _ => return true,
                 }
 
                 // Slot is now empty; reuse later.
                 self.emptied_collider_slots.push(ci);
             }
         }
+
+        true
     }
 }

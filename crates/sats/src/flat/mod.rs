@@ -12,6 +12,7 @@ use crate::SumValue;
 use core::mem::size_of;
 
 pub mod page;
+pub mod raw_page;
 pub mod table;
 pub mod offset_map;
 
@@ -294,6 +295,7 @@ impl SerializeFlat for SumValue {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)] // TODO(centril): Not valid; must consider var len bits.
 pub struct FlatProductValue<'a> {
     buffer: FlatBuffer<'a>,
 }
