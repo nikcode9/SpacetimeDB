@@ -119,7 +119,7 @@ fn resolve_id_or_default(identity: Option<&String>, config: &Config, server: Opt
 pub(super) async fn set_balance(
     client: &reqwest::Client,
     config: &Config,
-    hex_identity: &Identity,
+    identity: &Identity,
     balance: i128,
     server: Option<&str>,
 ) -> anyhow::Result<reqwest::Response> {
