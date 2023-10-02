@@ -56,21 +56,14 @@ pub struct OffsetMap {
 }
 
 impl OffsetMap {
-
-    pub fn new() -> Self {
-        Self {
-            offset_map: IntMap::default(),
-            colliders: Vec::new(),
-            emptied_collider_slots: Vec::new(),
-        }
-    }
-
-    /// The number of colliding hashes in the map
-    /// If two hashes collide then this counts as 2
+    /// The number of colliding hashes in the map.
+    ///
+    /// If two hashes collide then this counts as 2.
     pub fn num_collisions(&self) -> usize {
-        self.colliders.iter().fold(0, |acc, a| acc + a.len())
+        self.colliders.iter().map(|a| a.len()).sum()
     }
 
+    /// The number hashes that do not collide.
     pub fn num_non_collisions(&self) -> usize {
         self.offset_map.len() - (self.colliders.len() - self.emptied_collider_slots.len())
     }

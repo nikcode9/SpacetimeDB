@@ -13,7 +13,7 @@ fn bench_insert(c: &mut Criterion) {
     bench_group.throughput(Throughput::Elements(1));
     let bench_insert_inner = |bench: &mut Bencher<'_, _>, collision_ratio: &f64| {
         let setup_map = |rng: &mut ThreadRng, max_range: u64, preload_amt: usize| {
-            let mut map = OffsetMap::new();
+            let mut map = OffsetMap::default();
             for _ in 0..preload_amt {
                 let hash = RowHash(rng.gen_range(0..max_range));
                 let page = rng.gen::<usize>();
