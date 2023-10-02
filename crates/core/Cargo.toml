@@ -17,6 +17,10 @@ bench = false
 name = "odb_flavor_bench"
 harness = false
 
+[[bench]]
+name = "offset_map"
+harness = false
+
 [dependencies]
 spacetimedb-lib = { path = "../lib", version = "0.7.0" }
 spacetimedb-sats = { path = "../sats", version = "0.7.0" }

@@ -56,6 +56,36 @@ pub struct OffsetMap {
 }
 
 impl OffsetMap {
+
+    pub fn new() -> Self {
+        Self {
+            offset_map: IntMap::default(),
+            colliders: Vec::new(),
+            emptied_collider_slots: Vec::new(),
+        }
+    }
+
+    /// The number of colliding hashes in the map
+    /// If two hashes collide then this counts as 2
+    pub fn num_collisions(&self) -> usize {
+        self.colliders.iter().fold(0, |acc, a| acc + a.len())
+    }
+
+    pub fn num_non_collisions(&self) -> usize {
+        self.offset_map.len() - (self.colliders.len() - self.emptied_collider_slots.len())
+    }
+
+    /// The number of offsets in the map. This is equal to the number of non-colliding hashes
+    /// plus the number of colliding hashes.
+    pub fn len(&self) -> usize {
+        self.num_collisions() + self.num_non_collisions()
+    }
+
+    /// Returns true if there are no offsets in the map.
+    pub fn is_empty(&self) -> bool {
+        self.offset_map.is_empty()
+    }
+
     /// Returns the row offsets associated with the given row `hash`.
     pub fn offsets_for(&self, hash: RowHash) -> &[BufferOffset] {
         match self.offset_map.get(&hash) {

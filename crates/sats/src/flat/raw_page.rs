@@ -22,7 +22,7 @@ pub struct Page {
 
 /// An offset into a `Page`.
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub struct PageOffset(u16);
+pub struct PageOffset(pub u16);
 
 impl PageOffset {
     /// Returns the offset as a `usize` index.
@@ -167,7 +167,7 @@ pub struct BufferOffset {
 
 impl BufferOffset {
     /// Returns an offset that is `offset_in_page` bytes into `page`.
-    fn new(page: usize, offset_in_page: PageOffset) -> Self {
+    pub fn new(page: usize, offset_in_page: PageOffset) -> Self {
         Self {
             page_index: PageIndex(page as u32),
             offset_in_page,

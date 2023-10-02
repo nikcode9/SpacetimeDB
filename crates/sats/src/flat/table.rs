@@ -20,7 +20,7 @@ use crate::ProductType;
 ///   Moreover, due to random seeds, when restarting from disk,
 ///   the hashes may be different for the same rows.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct RowHash(u64);
+pub struct RowHash(pub u64);
 
 /// `RowHash` is already a hash, so no need to hash again.
 impl IsEnabled for RowHash {}
