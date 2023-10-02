@@ -1,17 +1,11 @@
 //! Benchmarks for evaluating various ODB storage systems for blob storage.
-
-use criterion::measurement::WallTime;
 use criterion::{criterion_group, criterion_main, Bencher, BenchmarkGroup, BenchmarkId, Criterion, Throughput, BatchSize};
 use rand::rngs::ThreadRng;
 use rand::{Rng, thread_rng};
-use spacetimedb::db::datastore::traits::ColId;
 use spacetimedb_sats::flat::raw_page::{BufferOffset, PageOffset};
 use spacetimedb_sats::flat::table::RowHash;
-use std::collections::hash_map::DefaultHasher;
 use std::time::{Instant, Duration};
 use spacetimedb_sats::flat::offset_map::OffsetMap;
-use rustc_hash::FxHasher;
-use std::hash::Hasher;
 
 
 fn bench_insert(c: &mut Criterion) {
