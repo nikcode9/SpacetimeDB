@@ -163,3 +163,11 @@ impl OffsetMap {
         true
     }
 }
+
+impl FromIterator<(RowHash, BufferOffset)> for OffsetMap {
+    fn from_iter<T: IntoIterator<Item = (RowHash, BufferOffset)>>(iter: T) -> Self {
+        let mut map = OffsetMap::default();
+        iter.into_iter().for_each(|(h, o)| map.insert(h, o));
+        map
+    }
+}
