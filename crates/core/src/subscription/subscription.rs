@@ -5,6 +5,7 @@ use spacetimedb_lib::PrimaryKey;
 use spacetimedb_sats::{AlgebraicValue, BuiltinValue};
 use spacetimedb_vm::expr::QueryExpr;
 use std::collections::HashSet;
+use std::time;
 
 use super::query::Query;
 use crate::db::datastore::locking_tx_datastore::MutTxId;
@@ -160,6 +161,7 @@ impl QuerySet {
         let mut database_update: DatabaseUpdate = DatabaseUpdate { tables: vec![] };
         let mut seen = HashSet::new();
 
+        let now = time::Instant::now();
         for query in &self.0 {
             for q in &query.queries {
                 if let Some(t) = q.source.get_db_table() {
@@ -195,6 +197,8 @@ impl QuerySet {
                 }
             }
         }
+        let elapsed = now.elapsed();
+        log::info!("subscription elapsed time ms: {}", elapsed.as_millis());
         Ok(database_update)
     }
 }

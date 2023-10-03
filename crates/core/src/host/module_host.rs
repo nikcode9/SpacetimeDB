@@ -21,7 +21,7 @@ use spacetimedb_sats::{ProductValue, Typespace, WithTypespace};
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::{Arc, Weak};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::sync::oneshot;
 
 #[derive(Debug, Default, Clone)]
@@ -85,7 +85,8 @@ impl DatabaseUpdate {
     }
 
     pub fn into_protobuf(self) -> SubscriptionUpdate {
-        SubscriptionUpdate {
+        let now = Instant::now();
+        let s = SubscriptionUpdate {
             table_updates: self
                 .tables
                 .into_iter()
@@ -111,13 +112,17 @@ impl DatabaseUpdate {
                         .collect(),
                 })
                 .collect(),
-        }
+        };
+        let elapsed = now.elapsed();
+        log::info!("binary serialization ms: {}", elapsed.as_millis());
+        s
     }
 
     pub fn into_json(self) -> SubscriptionUpdateJson {
         // For all tables, push all state
         // TODO: We need some way to namespace tables so we don't send all the internal tables and stuff
-        SubscriptionUpdateJson {
+        let now = Instant::now();
+        let s = SubscriptionUpdateJson {
             table_updates: self
                 .tables
                 .into_iter()
@@ -142,7 +147,10 @@ impl DatabaseUpdate {
                         .collect(),
                 })
                 .collect(),
-        }
+        };
+        let elapsed = now.elapsed();
+        log::info!("json serialization ms: {}", elapsed.as_millis());
+        s
     }
 }
 
