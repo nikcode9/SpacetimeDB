@@ -150,7 +150,12 @@ impl BenchDatabase for SpacetimeModule {
     }
 
     fn insert_bulk<T: BenchTable>(&mut self, table_id: &Self::TableId, rows: Vec<T>) -> ResultBench<()> {
-        let rows = rows.into_iter().map(|row| row.into_product_value()).collect();
+        let rows = rows
+            .into_iter()
+            .map(|row| row.into_product_value())
+            .collect::<Box<[_]>>()
+            .try_into()
+            .unwrap();
         let args = product![ArrayValue::Product(rows)];
         let SpacetimeModule { runtime, module } = self;
         let module = module.as_mut().unwrap();
@@ -190,7 +195,12 @@ impl BenchDatabase for SpacetimeModule {
 
         runtime.block_on(async move {
             module
-                .call_reducer_binary(&reducer_name, ProductValue { elements: vec![value] })
+                .call_reducer_binary(
+                    &reducer_name,
+                    ProductValue {
+                        elements: [value].into(),
+                    },
+                )
                 .await?;
             Ok(())
         })

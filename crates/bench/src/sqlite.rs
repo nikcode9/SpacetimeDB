@@ -8,7 +8,7 @@ use ahash::AHashMap;
 use lazy_static::lazy_static;
 use rusqlite::Connection;
 use spacetimedb::db::datastore::traits::TableSchema;
-use spacetimedb_lib::sats::{AlgebraicType, AlgebraicValue, ProductType};
+use spacetimedb_lib::sats::{AlgebraicType, AlgebraicValue, ProductType, SatsString};
 use std::{
     fmt::Write,
     hint::black_box,
@@ -28,7 +28,7 @@ impl BenchDatabase for SQLite {
         "sqlite"
     }
 
-    type TableId = String;
+    type TableId = SatsString;
 
     fn build(in_memory: bool, fsync: bool) -> ResultBench<Self>
     where
@@ -93,7 +93,7 @@ impl BenchDatabase for SQLite {
         log::info!("SQLITE: `{statement}`");
         self.db.execute_batch(&statement)?;
 
-        Ok(table_name)
+        Ok(SatsString::from_string(table_name))
     }
 
     fn get_table<T: BenchTable>(&mut self, table_id: &Self::TableId) -> ResultBench<TableSchema> {

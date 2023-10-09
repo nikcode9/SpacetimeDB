@@ -1,8 +1,9 @@
 use crate::algebraic_value::de::{ValueDeserializeError, ValueDeserializer};
 use crate::algebraic_value::ser::ValueSerializer;
 use crate::meta_type::MetaType;
+use crate::slim_slice::SlimSliceBoxCollected;
 use crate::{de::Deserialize, ser::Serialize};
-use crate::{AlgebraicType, AlgebraicValue, ProductTypeElement};
+use crate::{static_assert_size, string, AlgebraicType, AlgebraicValue, ProductTypeElement, SatsString, SatsVec};
 
 /// A structural product type  of the factors given by `elements`.
 ///
@@ -34,12 +35,17 @@ pub struct ProductType {
     ///
     /// These factors can either be named or unnamed.
     /// When all the factors are unnamed, we can regard this as a plain tuple type.
-    pub elements: Vec<ProductTypeElement>,
+    pub elements: SatsVec<ProductTypeElement>,
 }
+
+#[cfg(target_arch = "wasm32")]
+static_assert_size!(ProductType, 8);
+#[cfg(not(target_arch = "wasm32"))]
+static_assert_size!(ProductType, 12);
 
 impl ProductType {
     /// Returns a product type with the given `elements` as its factors.
-    pub const fn new(elements: Vec<ProductTypeElement>) -> Self {
+    pub const fn new(elements: SatsVec<ProductTypeElement>) -> Self {
         Self { elements }
     }
 
@@ -49,7 +55,7 @@ impl ProductType {
             [ProductTypeElement {
                 name: Some(name),
                 algebraic_type,
-            }] => name == check && algebraic_type.is_bytes(),
+            }] => name == &check && algebraic_type.is_bytes(),
             _ => false,
         }
     }
@@ -72,27 +78,42 @@ impl ProductType {
 
 impl<I: Into<ProductTypeElement>> FromIterator<I> for ProductType {
     fn from_iter<T: IntoIterator<Item = I>>(iter: T) -> Self {
-        Self::new(iter.into_iter().map(Into::into).collect())
+        Self::new(
+            iter.into_iter()
+                .map(Into::into)
+                .collect::<SlimSliceBoxCollected<_>>()
+                .unwrap(),
+        )
     }
 }
-impl<'a, I: Into<AlgebraicType>> FromIterator<(&'a str, I)> for ProductType {
-    fn from_iter<T: IntoIterator<Item = (&'a str, I)>>(iter: T) -> Self {
+impl<I: Into<AlgebraicType>> FromIterator<(SatsString, I)> for ProductType {
+    fn from_iter<T: IntoIterator<Item = (SatsString, I)>>(iter: T) -> Self {
+        iter.into_iter().map(|(name, ty)| (Some(name), ty.into())).collect()
+    }
+}
+
+impl<I: Into<AlgebraicType>> FromIterator<(Option<SatsString>, I)> for ProductType {
+    fn from_iter<T: IntoIterator<Item = (Option<SatsString>, I)>>(iter: T) -> Self {
         iter.into_iter()
-            .map(|(name, ty)| ProductTypeElement::new_named(ty.into(), name))
+            .map(|(name, ty)| ProductTypeElement::new(ty.into(), name))
             .collect()
+    }
+}
+
+impl<'a, I: Into<AlgebraicType>> FromIterator<(&'a str, I)> for ProductType {
+    fn from_iter<T: IntoIterator<Item = (&'a str, I)>>(iter: T) -> ProductType {
+        iter.into_iter().map(|(s, t)| (Some(s), t.into())).collect()
     }
 }
 
 impl<'a, I: Into<AlgebraicType>> FromIterator<(Option<&'a str>, I)> for ProductType {
-    fn from_iter<T: IntoIterator<Item = (Option<&'a str>, I)>>(iter: T) -> Self {
-        iter.into_iter()
-            .map(|(name, ty)| ProductTypeElement::new(ty.into(), name.map(str::to_string)))
-            .collect()
+    fn from_iter<T: IntoIterator<Item = (Option<&'a str>, I)>>(iter: T) -> ProductType {
+        iter.into_iter().map(|(s, t)| (s.map(string), t.into())).collect()
     }
 }
 
-impl From<Vec<ProductTypeElement>> for ProductType {
-    fn from(fields: Vec<ProductTypeElement>) -> Self {
+impl From<SatsVec<ProductTypeElement>> for ProductType {
+    fn from(fields: SatsVec<ProductTypeElement>) -> Self {
         ProductType::new(fields)
     }
 }
@@ -125,7 +146,7 @@ impl MetaType for ProductType {
 
 impl ProductType {
     pub fn as_value(&self) -> AlgebraicValue {
-        self.serialize(ValueSerializer).unwrap_or_else(|x| match x {})
+        self.serialize(ValueSerializer).expect("unexpected `len >= u32::MAX`")
     }
 
     pub fn from_value(value: &AlgebraicValue) -> Result<ProductType, ValueDeserializeError> {

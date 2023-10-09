@@ -3,12 +3,12 @@ use crate::{
     schemas::{table_name, BenchTable, IndexStrategy},
     ResultBench,
 };
-use spacetimedb::db::datastore::traits::{IndexDef, TableDef, TableSchema};
+use spacetimedb::db::datastore::traits::{ColId, IndexDef, TableDef, TableSchema};
 use spacetimedb::db::relational_db::{open_db, RelationalDB};
 use spacetimedb::error::DBError;
 use spacetimedb::sql::execute::run;
 use spacetimedb_lib::identity::AuthCtx;
-use spacetimedb_lib::sats::AlgebraicValue;
+use spacetimedb_lib::sats::{string, AlgebraicValue, SatsString};
 use std::hint::black_box;
 use tempdir::TempDir;
 
@@ -38,22 +38,22 @@ impl BenchDatabase for SpacetimeRaw {
     }
 
     fn create_table<T: BenchTable>(&mut self, index_strategy: IndexStrategy) -> ResultBench<Self::TableId> {
-        let name = table_name::<T>(index_strategy);
+        let name = SatsString::from_string(table_name::<T>(index_strategy));
         self.db.with_auto_commit(|tx| {
             let table_def = TableDef::from(T::product_type());
             let table_id = self.db.create_table(tx, table_def)?;
-            self.db.rename_table(tx, table_id, &name)?;
+            self.db.rename_table(tx, table_id, name)?;
             match index_strategy {
                 IndexStrategy::Unique => {
                     self.db
-                        .create_index(tx, IndexDef::new("id".to_string(), table_id, 0, true))?;
+                        .create_index(tx, IndexDef::new(string("id"), table_id, ColId(0), true))?;
                 }
                 IndexStrategy::NonUnique => (),
                 IndexStrategy::MultiIndex => {
                     for (i, column) in T::product_type().elements.iter().enumerate() {
                         self.db.create_index(
                             tx,
-                            IndexDef::new(column.name.clone().unwrap(), table_id, i as u32, false),
+                            IndexDef::new(column.name.clone().unwrap(), table_id, ColId(i as u32), false),
                         )?;
                     }
                 }

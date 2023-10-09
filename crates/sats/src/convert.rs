@@ -1,4 +1,4 @@
-use crate::{AlgebraicType, AlgebraicValue, ArrayType, BuiltinType, MapType, ProductType, ProductValue};
+use crate::{AlgebraicType, AlgebraicValue, MapType, MapValue, ProductType, ProductValue, SatsVec};
 
 impl crate::Value for AlgebraicValue {
     type Type = AlgebraicType;
@@ -22,15 +22,9 @@ impl From<AlgebraicType> for ProductType {
     }
 }
 
-impl From<ArrayType> for AlgebraicType {
-    fn from(x: ArrayType) -> Self {
-        BuiltinType::Array(x).into()
-    }
-}
-
 impl From<MapType> for AlgebraicType {
     fn from(x: MapType) -> Self {
-        BuiltinType::Map(Box::new(x)).into()
+        Box::new(x).into()
     }
 }
 
@@ -43,8 +37,9 @@ macro_rules! built_in_into {
         }
     };
 }
-
+built_in_into!(u128, U128);
+built_in_into!(i128, I128);
 built_in_into!(f32, F32);
 built_in_into!(f64, F64);
-built_in_into!(&str, String);
-built_in_into!(&[u8], Bytes);
+built_in_into!(MapValue, Map);
+built_in_into!(SatsVec<u8>, Bytes);

@@ -16,10 +16,12 @@ pub mod product_value;
 mod resolve_refs;
 pub mod satn;
 pub mod ser;
+pub mod slim_slice;
 pub mod sum_type;
 pub mod sum_type_variant;
 pub mod sum_value;
 pub mod typespace;
+mod util;
 
 pub use algebraic_type::AlgebraicType;
 pub use algebraic_type_ref::AlgebraicTypeRef;
@@ -36,6 +38,11 @@ pub use sum_type_variant::SumTypeVariant;
 pub use sum_value::SumValue;
 pub use typespace::{SpacetimeType, Typespace};
 
+pub use slim_slice::SlimNonEmpty as SatsNonEmpty;
+pub use slim_slice::{slice, slice_mut, str, str_mut, string};
+pub use slim_slice::{SlimSlice as SatsSlice, SlimSliceBox as SatsVec, SlimSliceMut as SatsSliceMut};
+pub use slim_slice::{SlimStr as SatsStr, SlimStrBox as SatsString, SlimStrMut as SatsStrMut};
+
 /// The `Value` trait provides an abstract notion of a value.
 ///
 /// All we know about values abstractly is that they have a `Type`.
@@ -44,7 +51,7 @@ pub trait Value {
     type Type;
 }
 
-impl<T: Value> Value for Vec<T> {
+impl<T: Value> Value for SatsVec<T> {
     // TODO(centril/phoebe): This looks weird; shouldn't it be ArrayType?
     type Type = T::Type;
 }
@@ -97,7 +104,7 @@ impl<'a, T: Value> ValueWithType<'a, T> {
     }
 }
 
-impl<'a, T: Value> ValueWithType<'a, Vec<T>> {
+impl<'a, T: Value> ValueWithType<'a, SatsVec<T>> {
     pub fn iter(&self) -> impl Iterator<Item = ValueWithType<'_, T>> {
         self.value().iter().map(|val| ValueWithType { ty: self.ty, val })
     }

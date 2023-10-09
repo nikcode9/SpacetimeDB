@@ -6,6 +6,7 @@ use spacetimedb_lib::relation::{DbTable, Header, MemTable};
 use spacetimedb_sats::algebraic_value::AlgebraicValue;
 use spacetimedb_sats::product_type::ProductType;
 use spacetimedb_sats::product_value::ProductValue;
+use spacetimedb_sats::SatsString;
 use std::collections::HashMap;
 
 pub fn scalar<T: Into<AlgebraicValue>>(of: T) -> AlgebraicValue {
@@ -36,7 +37,7 @@ where
 
 pub fn db_table_raw(
     head: ProductType,
-    name: String,
+    name: SatsString,
     table_id: u32,
     table_type: StTableType,
     table_access: StAccess,
@@ -46,7 +47,7 @@ pub fn db_table_raw(
 }
 
 /// Create a [DbTable] of type [StTableType::User] and derive `StAccess::for_name(name)`.
-pub fn db_table(head: ProductType, name: String, table_id: u32) -> DbTable {
+pub fn db_table(head: ProductType, name: SatsString, table_id: u32) -> DbTable {
     let access = StAccess::for_name(&name);
     db_table_raw(head, name, table_id, StTableType::User, access)
 }
