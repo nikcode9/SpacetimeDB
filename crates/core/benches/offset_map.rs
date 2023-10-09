@@ -1,6 +1,6 @@
-//! Benchmarks for evaluating various ODB storage systems for blob storage.
+//! Benchmarks for the offset_map 
 use criterion::{
-    criterion_group, criterion_main, BatchSize, Bencher, BenchmarkGroup, BenchmarkId, Criterion, Throughput, black_box,
+    criterion_group, criterion_main, Bencher, BenchmarkId, Criterion, Throughput, black_box,
 };
 use rand::rngs::ThreadRng;
 use rand::{thread_rng, Rng};
@@ -61,7 +61,7 @@ fn bench_insert(c: &mut Criterion) {
             total_duration
         });
     };
-    let mut bench_group = c.benchmark_group("offset_map_insert");
+    let mut bench_group = c.benchmark_group("insert");
     bench_group.throughput(Throughput::Elements(1));
     bench_group.bench_with_input(
         BenchmarkId::new("load/10_000/insert/1000/collisions", "0%"),
@@ -85,7 +85,7 @@ fn bench_insert(c: &mut Criterion) {
     );
     bench_group.bench_with_input(
         BenchmarkId::new("load/10_000/insert/1000/collisions", "100%"),
-        &0.50_f64,
+        &1_f64,
         bench_insert_inner,
     );
 
@@ -93,6 +93,7 @@ fn bench_insert(c: &mut Criterion) {
 }
 
 fn bench_offsets_for(c: &mut Criterion) {
+    const NUM_GETS_PER_MAP: usize = 1000;
     let bench_insert_inner = |bench: &mut Bencher<'_, _>, collision_ratio: &f64| {
         bench.iter_custom(|iters| {
             let mut rng = thread_rng();
@@ -109,11 +110,11 @@ fn bench_offsets_for(c: &mut Criterion) {
             while num_iters < iters {
                 let mut map = OffsetMap::default();
                 let preloaded = gen_hash_and_offsets(&mut rng, max_range, preload_amt).collect::<Vec<_>>();
-                let queries = preloaded.choose_multiple(&mut rng, 1000).collect::<Vec<_>>();
+                let queries = preloaded.choose_multiple(&mut rng, NUM_GETS_PER_MAP).collect::<Vec<_>>();
                 for (row_hash, buffer_offset) in &preloaded {
                     map.insert(*row_hash, *buffer_offset)
                 }
-                println!("{}, {}, {}", map.len(), map.num_collisions(), map.num_non_collisions());
+                // println!("{}, {}, {}", map.len(), map.num_collisions(), map.num_non_collisions());
                 for val in queries {
                     // Compute duration of offset map insertion.
                     let start = Instant::now();
@@ -130,7 +131,7 @@ fn bench_offsets_for(c: &mut Criterion) {
             total_duration
         });
     };
-    let mut bench_group = c.benchmark_group("offset_map_offsets_for");
+    let mut bench_group = c.benchmark_group("offsets_for");
     bench_group.throughput(Throughput::Elements(1));
     bench_group.bench_with_input(
         BenchmarkId::new("load/10_000/get/1000/collisions", "0%"),
@@ -154,13 +155,11 @@ fn bench_offsets_for(c: &mut Criterion) {
     );
     bench_group.bench_with_input(
         BenchmarkId::new("load/10_000/get/1000/collisions", "100%"),
-        &0.50_f64,
+        &1_f64,
         bench_insert_inner,
     );
 
     bench_group.finish();
-
-
 }
 
 criterion_group!(benches, bench_insert, bench_offsets_for);
