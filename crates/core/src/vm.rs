@@ -9,7 +9,7 @@ use spacetimedb_lib::identity::AuthCtx;
 use spacetimedb_lib::relation::{DbTable, FieldExpr, FieldName, Relation};
 use spacetimedb_lib::relation::{Header, MemTable, RelIter, RelValue, RowCount, Table};
 use spacetimedb_lib::table::ProductTypeMeta;
-use spacetimedb_primitives::ColId;
+use spacetimedb_primitives::{ColId, TableId};
 use spacetimedb_sats::{AlgebraicValue, ProductValue};
 use spacetimedb_vm::dsl::mem_table;
 use spacetimedb_vm::env::EnvDb;
@@ -168,7 +168,7 @@ pub struct IndexSemiJoin<'a, Rhs: RelOps> {
     // Also the return header since we are returning values from the index side.
     pub index_header: Header,
     // The table id on which the index is defined.
-    pub index_table: u32,
+    pub index_table: TableId,
     // The column id for which the index is defined.
     pub index_col: ColId,
     // An iterator for the index side.
@@ -187,7 +187,7 @@ impl<'a, Rhs: RelOps> IndexSemiJoin<'a, Rhs> {
         probe_side: Rhs,
         probe_field: FieldName,
         index_header: Header,
-        index_table: u32,
+        index_table: TableId,
         index_col: ColId,
     ) -> Self {
         IndexSemiJoin {
@@ -332,7 +332,7 @@ impl<'db, 'tx> DbProgram<'db, 'tx> {
             if meta.is_unique() {
                 indexes.push(IndexDef::new(
                     format!("{}_{}_idx", table_name, i),
-                    0, // Ignored
+                    TableId(0), // Ignored
                     ColId(i as u32),
                     true,
                 ));
@@ -518,6 +518,7 @@ pub(crate) mod tests {
     use nonempty::NonEmpty;
     use spacetimedb_lib::error::ResultTest;
     use spacetimedb_lib::relation::{DbTable, FieldName};
+    use spacetimedb_primitives::TableId;
     use spacetimedb_sats::{product, AlgebraicType, ProductType, ProductValue};
     use spacetimedb_vm::dsl::*;
     use spacetimedb_vm::eval::run_ast;
@@ -529,7 +530,7 @@ pub(crate) mod tests {
         table_name: &str,
         schema: ProductType,
         rows: &[ProductValue],
-    ) -> ResultTest<u32> {
+    ) -> ResultTest<TableId> {
         let table_id = db.create_table(
             tx,
             TableDef {
@@ -561,7 +562,7 @@ pub(crate) mod tests {
         table_name: &str,
         schema: ProductType,
         rows: &[ProductValue],
-    ) -> ResultTest<u32> {
+    ) -> ResultTest<TableId> {
         let db = &mut p.db;
         create_table_with_rows(db, p.tx, table_name, schema, rows)
     }
@@ -636,7 +637,7 @@ pub(crate) mod tests {
             p,
             ST_TABLES_NAME,
             (&StTableRow {
-                table_id: ST_TABLES_ID.0,
+                table_id: ST_TABLES_ID,
                 table_name: ST_TABLES_NAME,
                 table_type: StTableType::System,
                 table_access: StAccess::Public,
@@ -673,7 +674,7 @@ pub(crate) mod tests {
             p,
             ST_COLUMNS_NAME,
             (&StColumnRow {
-                table_id: ST_COLUMNS_ID.0,
+                table_id: ST_COLUMNS_ID,
                 col_id: StColumnFields::TableId.col_id(),
                 col_name: StColumnFields::TableId.name(),
                 col_type: AlgebraicType::U32,
@@ -749,7 +750,7 @@ pub(crate) mod tests {
             (&StSequenceRow {
                 sequence_id: 1,
                 sequence_name: "sequence_id_seq",
-                table_id: 2,
+                table_id: TableId(2),
                 col_id: ColId(0),
                 increment: 1,
                 start: 4,

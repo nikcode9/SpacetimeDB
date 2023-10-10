@@ -15,7 +15,7 @@ use super::{system_tables::StTableRow, Result};
 pub struct SequenceSchema {
     pub(crate) sequence_id: u32,
     pub(crate) sequence_name: String,
-    pub(crate) table_id: u32,
+    pub(crate) table_id: TableId,
     pub(crate) col_id: ColId,
     pub(crate) increment: i128,
     pub(crate) start: i128,
@@ -29,7 +29,7 @@ pub struct SequenceSchema {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SequenceDef {
     pub(crate) sequence_name: String,
-    pub(crate) table_id: u32,
+    pub(crate) table_id: TableId,
     pub(crate) col_id: ColId,
     pub(crate) increment: i128,
     pub(crate) start: Option<i128>,
@@ -40,7 +40,7 @@ pub struct SequenceDef {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IndexSchema {
     pub(crate) index_id: u32,
-    pub(crate) table_id: u32,
+    pub(crate) table_id: TableId,
     pub(crate) index_name: String,
     pub(crate) is_unique: bool,
     pub(crate) cols: NonEmpty<ColId>,
@@ -49,14 +49,14 @@ pub struct IndexSchema {
 /// This type is just the [IndexSchema] without the autoinc fields
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IndexDef {
-    pub(crate) table_id: u32,
+    pub(crate) table_id: TableId,
     pub(crate) cols: NonEmpty<ColId>,
     pub(crate) name: String,
     pub(crate) is_unique: bool,
 }
 
 impl IndexDef {
-    pub fn new(name: String, table_id: u32, col_id: ColId, is_unique: bool) -> Self {
+    pub fn new(name: String, table_id: TableId, col_id: ColId, is_unique: bool) -> Self {
         Self {
             cols: NonEmpty::new(col_id),
             name,
@@ -79,7 +79,7 @@ impl From<IndexSchema> for IndexDef {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ColumnSchema {
-    pub table_id: u32,
+    pub table_id: TableId,
     pub col_id: ColId,
     pub col_name: String,
     pub col_type: AlgebraicType,
@@ -143,7 +143,7 @@ pub struct ConstraintSchema {
     pub(crate) constraint_id: u32,
     pub(crate) constraint_name: String,
     pub(crate) kind: ColumnIndexAttribute,
-    pub(crate) table_id: u32,
+    pub(crate) table_id: TableId,
     pub(crate) columns: Vec<u32>,
 }
 
@@ -152,13 +152,13 @@ pub struct ConstraintSchema {
 pub struct ConstraintDef {
     pub(crate) constraint_name: String,
     pub(crate) kind: ColumnIndexAttribute,
-    pub(crate) table_id: u32,
+    pub(crate) table_id: TableId,
     pub(crate) columns: Vec<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TableSchema {
-    pub table_id: u32,
+    pub table_id: TableId,
     pub table_name: String,
     pub columns: Vec<ColumnSchema>,
     pub indexes: Vec<IndexSchema>,
@@ -428,12 +428,11 @@ pub trait MutTxDatastore: TxDatastore + MutTx {
     fn table_name_from_id_mut_tx(&self, tx: &Self::MutTxId, table_id: TableId) -> Result<Option<String>>;
     fn get_all_tables_mut_tx(&self, tx: &Self::MutTxId) -> super::Result<Vec<TableSchema>> {
         let mut tables = Vec::new();
-        let table_rows = self.iter_mut_tx(tx, TableId(ST_TABLES_ID))?.collect::<Vec<_>>();
+        let table_rows = self.iter_mut_tx(tx, ST_TABLES_ID)?.collect::<Vec<_>>();
         for data_ref in table_rows {
             let data = self.data_to_owned(data_ref);
             let row = StTableRow::try_from(data.view())?;
-            let table_id = TableId(row.table_id);
-            tables.push(self.schema_for_table_mut_tx(tx, table_id)?);
+            tables.push(self.schema_for_table_mut_tx(tx, row.table_id)?);
         }
         Ok(tables)
     }

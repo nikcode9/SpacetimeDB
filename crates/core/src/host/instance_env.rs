@@ -18,7 +18,7 @@ use spacetimedb_lib::filter::CmpArgs;
 use spacetimedb_lib::identity::AuthCtx;
 use spacetimedb_lib::operator::OpQuery;
 use spacetimedb_lib::relation::{FieldExpr, FieldName};
-use spacetimedb_primitives::ColId;
+use spacetimedb_primitives::{ColId, TableId};
 use spacetimedb_sats::{ProductType, Typespace};
 use spacetimedb_vm::expr::{Code, ColumnOp};
 
@@ -69,7 +69,7 @@ impl InstanceEnv {
         log::trace!("MOD({}): {}", self.dbic.address.to_abbreviated_hex(), record.message);
     }
 
-    pub fn insert(&self, table_id: u32, buffer: &[u8]) -> Result<ProductValue, NodesError> {
+    pub fn insert(&self, table_id: TableId, buffer: &[u8]) -> Result<ProductValue, NodesError> {
         let stdb = &*self.dbic.relational_db;
         let tx = &mut *self.get_tx()?;
 
@@ -97,7 +97,7 @@ impl InstanceEnv {
 
     /*
     #[tracing::instrument(skip_all)]
-    pub fn delete_pk(&self, table_id: u32, buffer: &[u8]) -> Result<(), NodesError> {
+    pub fn delete_pk(&self, table_id: TableId, buffer: &[u8]) -> Result<(), NodesError> {
         self.measure(table_id, &INSTANCE_ENV_DELETE_PK);
 
         // Decode the primary key.
@@ -107,7 +107,7 @@ impl InstanceEnv {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn delete_value(&self, table_id: u32, buffer: &[u8]) -> Result<(), NodesError> {
+    pub fn delete_value(&self, table_id: TableId, buffer: &[u8]) -> Result<(), NodesError> {
         let measure = self.measure(table_id, &INSTANCE_ENV_DELETE_VALUE);
 
         let stdb = &*self.dbic.relational_db;
@@ -145,7 +145,7 @@ impl InstanceEnv {
     ///
     /// Returns an error if no columns were deleted or if the column wasn't found.
     #[tracing::instrument(skip(self, value))]
-    pub fn delete_by_col_eq(&self, table_id: u32, col_id: ColId, value: &[u8]) -> Result<u32, NodesError> {
+    pub fn delete_by_col_eq(&self, table_id: TableId, col_id: ColId, value: &[u8]) -> Result<u32, NodesError> {
         let stdb = &*self.dbic.relational_db;
         let tx = &mut *self.get_tx()?;
 
@@ -169,7 +169,7 @@ impl InstanceEnv {
     #[tracing::instrument(skip_all)]
     pub fn delete_range(
         &self,
-        table_id: u32,
+        table_id: TableId,
         cols: u32,
         start_buffer: &[u8],
         end_buffer: &[u8],
@@ -235,7 +235,7 @@ impl InstanceEnv {
     ///
     /// Errors with `TableNotFound` if the table does not exist.
     #[tracing::instrument(skip_all)]
-    pub fn get_table_id(&self, table_name: String) -> Result<u32, NodesError> {
+    pub fn get_table_id(&self, table_name: String) -> Result<TableId, NodesError> {
         let stdb = &*self.dbic.relational_db;
         let tx = &mut *self.get_tx()?;
 
@@ -262,7 +262,7 @@ impl InstanceEnv {
     pub fn create_index(
         &self,
         index_name: String,
-        table_id: u32,
+        table_id: TableId,
         index_type: u8,
         col_ids: Vec<u8>,
     ) -> Result<(), NodesError> {
@@ -305,7 +305,7 @@ impl InstanceEnv {
     /// Matching is defined by decoding of `value` to an `AlgebraicValue`
     /// according to the column's schema and then `Ord for AlgebraicValue`.
     #[tracing::instrument(skip_all)]
-    pub fn iter_by_col_eq(&self, table_id: u32, col_id: ColId, value: &[u8]) -> Result<Vec<u8>, NodesError> {
+    pub fn iter_by_col_eq(&self, table_id: TableId, col_id: ColId, value: &[u8]) -> Result<Vec<u8>, NodesError> {
         let stdb = &*self.dbic.relational_db;
         let tx = &mut *self.get_tx()?;
 
@@ -323,7 +323,7 @@ impl InstanceEnv {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn iter(&self, table_id: u32) -> impl Iterator<Item = Result<Vec<u8>, NodesError>> {
+    pub fn iter(&self, table_id: TableId) -> impl Iterator<Item = Result<Vec<u8>, NodesError>> {
         use genawaiter::{sync::gen, yield_, GeneratorState};
 
         // Cheap Arc clones to untie the returned iterator from our own lifetime.
@@ -373,7 +373,7 @@ impl InstanceEnv {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn iter_filtered(&self, table_id: u32, filter: &[u8]) -> Result<impl Iterator<Item = Vec<u8>>, NodesError> {
+    pub fn iter_filtered(&self, table_id: TableId, filter: &[u8]) -> Result<impl Iterator<Item = Vec<u8>>, NodesError> {
         use spacetimedb_lib::filter;
 
         fn filter_to_column_op(table_name: &str, filter: filter::Expr) -> ColumnOp {

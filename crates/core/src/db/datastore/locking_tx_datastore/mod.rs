@@ -409,7 +409,7 @@ impl Inner {
             // TODO: If we exceed  `SEQUENCE_PREALLOCATION_AMOUNT` we will get a unique violation
             if col.is_autoinc {
                 // The database is bootstrapped with the total of `SystemTables::total_` that identify what is the start of the sequence
-                let (seq_start, seq_id): (i128, SequenceId) = match TableId(schema.table_id) {
+                let (seq_start, seq_id): (i128, SequenceId) = match schema.table_id {
                     ST_TABLES_ID => (SystemTables::total_tables() as i128, TABLE_ID_SEQUENCE_ID),
                     ST_INDEXES_ID => (
                         (SystemTables::total_indexes() + SystemTables::total_constraints_indexes()) as i128,
@@ -518,7 +518,7 @@ impl Inner {
             let is_system_table = self
                 .committed_state
                 .tables
-                .get(&TableId(sequence.table_id))
+                .get(&sequence.table_id)
                 .map_or(false, |x| x.schema.table_type == StTableType::System);
 
             let schema = (&sequence).into();
@@ -541,7 +541,7 @@ impl Inner {
         let rows = st_indexes.scan_rows().cloned().collect::<Vec<_>>();
         for row in rows {
             let index_row = StIndexRow::try_from(&row)?;
-            let table = self.committed_state.get_table(&TableId(index_row.table_id)).unwrap();
+            let table = self.committed_state.get_table(&index_row.table_id).unwrap();
             let mut index = BTreeIndex::new(
                 IndexId(index_row.index_id),
                 index_row.table_id,
@@ -563,7 +563,7 @@ impl Inner {
         let rows = st_tables.scan_rows().cloned().collect::<Vec<_>>();
         for row in rows {
             let table_row = StTableRow::try_from(&row)?;
-            let table_id = TableId(table_row.table_id);
+            let table_id = table_row.table_id;
             let schema = self.schema_for_table(table_id)?;
             let row_type = self.row_type_for_table(table_id)?;
             if self.committed_state.get_table(&table_id).is_none() {
@@ -586,7 +586,7 @@ impl Inner {
         let rows = self.iter_by_col_eq(&ST_TABLES_ID, &ST_TABLES_TABLE_ID_COL, table_id.into())?;
         let rows = rows.map(|row| row.view().to_owned()).collect::<Vec<_>>();
         if rows.is_empty() {
-            return Err(TableError::IdNotFound(table_id.0).into());
+            return Err(TableError::IdNotFound(table_id).into());
         }
         self.delete_by_rel(&table_id, rows)?;
         Ok(())
@@ -597,7 +597,7 @@ impl Inner {
         let rows = self.iter_by_col_eq(&ST_COLUMNS_ID, &ST_COLUMNS_TABLE_ID_COL, table_id.into())?;
         let rows = rows.map(|row| row.view().to_owned()).collect::<Vec<_>>();
         if rows.is_empty() {
-            return Err(TableError::IdNotFound(table_id.0).into());
+            return Err(TableError::IdNotFound(table_id).into());
         }
         self.delete_by_rel(&table_id, rows)?;
         Ok(())
@@ -719,7 +719,7 @@ impl Inner {
         // NOTE: Because st_tables has a unique index on table_name, this will
         // fail if the table already exists.
         let row = StTableRow {
-            table_id: 0,
+            table_id: TableId(0),
             table_name,
             table_type: table_schema.table_type,
             table_access: table_schema.table_access,
@@ -754,11 +754,11 @@ impl Inner {
         }
 
         // Get the half formed schema
-        let schema = self.schema_for_table(TableId(table_id))?;
+        let schema = self.schema_for_table(table_id)?;
 
         // Create the in memory representation of the table
         // NOTE: This should be done before creating the indexes
-        self.create_table_internal(TableId(table_id), table_schema.get_row_type(), schema)?;
+        self.create_table_internal(table_id, table_schema.get_row_type(), schema)?;
 
         // Create the indexes for the table
         for mut index in table_schema.indexes {
@@ -770,7 +770,7 @@ impl Inner {
 
         log::trace!("TABLE CREATED: {table_name}, table_id:{table_id}");
 
-        Ok(TableId(table_id))
+        Ok(table_id)
     }
 
     fn create_table_internal(
@@ -836,7 +836,7 @@ impl Inner {
         .collect::<Vec<_>>();
         assert!(rows.len() <= 1, "Expected at most one row in st_tables for table_id");
 
-        let row = rows.first().ok_or_else(|| TableError::IdNotFound(table_id.0))?;
+        let row = rows.first().ok_or_else(|| TableError::IdNotFound(table_id))?;
         let el = StTableRow::try_from(row.view())?;
         let table_name = el.table_name.to_owned();
         let table_id = el.table_id;
@@ -931,7 +931,7 @@ impl Inner {
             .iter_by_col_eq(&ST_TABLES_ID, &ST_TABLES_TABLE_ID_COL, table_id.into())?
             .collect::<Vec<_>>();
         assert!(rows.len() <= 1, "Expected at most one row in st_tables for table_id");
-        let row = rows.first().ok_or_else(|| TableError::IdNotFound(table_id.0))?;
+        let row = rows.first().ok_or_else(|| TableError::IdNotFound(table_id))?;
         let row_id = RowId(row.view().to_data_key());
         let mut el = StTableRow::try_from(row.view())?;
         el.table_name = new_name;
@@ -983,7 +983,7 @@ impl Inner {
         let index_id = StIndexRow::try_from(&self.insert(ST_INDEXES_ID, (&row).into())?)?.index_id;
 
         // Create the index in memory
-        if !self.table_exists(&TableId(index.table_id)) {
+        if !self.table_exists(&index.table_id) {
             return Err(TableError::IdNotFound(index.table_id).into());
         }
         self.create_index_internal(IndexId(index_id), &index)?;
@@ -998,31 +998,27 @@ impl Inner {
     }
 
     fn create_index_internal(&mut self, index_id: IndexId, index: &IndexDef) -> super::Result<()> {
-        let insert_table = if let Some(insert_table) = self
-            .tx_state
-            .as_mut()
-            .unwrap()
-            .get_insert_table_mut(&TableId(index.table_id))
-        {
-            insert_table
-        } else {
-            let row_type = self.row_type_for_table(TableId(index.table_id))?;
-            let schema = self.schema_for_table(TableId(index.table_id))?;
-            self.tx_state.as_mut().unwrap().insert_tables.insert(
-                TableId(index.table_id),
-                Table {
-                    row_type,
-                    schema,
-                    indexes: HashMap::new(),
-                    rows: BTreeMap::new(),
-                },
-            );
-            self.tx_state
-                .as_mut()
-                .unwrap()
-                .get_insert_table_mut(&TableId(index.table_id))
-                .unwrap()
-        };
+        let insert_table =
+            if let Some(insert_table) = self.tx_state.as_mut().unwrap().get_insert_table_mut(&index.table_id) {
+                insert_table
+            } else {
+                let row_type = self.row_type_for_table(index.table_id)?;
+                let schema = self.schema_for_table(index.table_id)?;
+                self.tx_state.as_mut().unwrap().insert_tables.insert(
+                    index.table_id,
+                    Table {
+                        row_type,
+                        schema,
+                        indexes: HashMap::new(),
+                        rows: BTreeMap::new(),
+                    },
+                );
+                self.tx_state
+                    .as_mut()
+                    .unwrap()
+                    .get_insert_table_mut(&index.table_id)
+                    .unwrap()
+            };
 
         let mut insert_index = BTreeIndex::new(
             index_id,
@@ -1034,7 +1030,7 @@ impl Inner {
         insert_index.build_from_rows(insert_table.scan_rows())?;
 
         // NOTE: Also add all the rows in the already committed table to the index.
-        if let Some(committed_table) = self.committed_state.get_table(&TableId(index.table_id)) {
+        if let Some(committed_table) = self.committed_state.get_table(&index.table_id) {
             insert_index.build_from_rows(committed_table.scan_rows())?;
         }
 
@@ -1231,7 +1227,7 @@ impl Inner {
             table
         } else {
             let Some(committed_table) = self.committed_state.tables.get(&table_id) else {
-                return Err(TableError::IdNotFound(table_id.0).into());
+                return Err(TableError::IdNotFound(table_id).into());
             };
             let table = Table {
                 row_type: committed_table.row_type.clone(),
@@ -1342,11 +1338,7 @@ impl Inner {
 
             // TODO(cloutiertyler): should probably also check that all the columns are correct? Perf considerations.
             if insert_table.row_type.elements.len() != row.elements.len() {
-                return Err(TableError::RowInvalidType {
-                    table_id: table_id.0,
-                    row,
-                }
-                .into());
+                return Err(TableError::RowInvalidType { table_id, row }.into());
             }
 
             insert_table.insert(row_id, row);
@@ -1364,7 +1356,7 @@ impl Inner {
 
     fn get(&self, table_id: &TableId, row_id: &RowId) -> super::Result<Option<DataRef>> {
         if !self.table_exists(table_id) {
-            return Err(TableError::IdNotFound(table_id.0).into());
+            return Err(TableError::IdNotFound(*table_id).into());
         }
         match self.tx_state.as_ref().unwrap().get_row_op(table_id, row_id) {
             RowState::Committed(_) => unreachable!("a row cannot be committed in a tx state"),
@@ -1465,7 +1457,7 @@ impl Inner {
         if self.table_exists(table_id) {
             return Ok(Iter::new(*table_id, self));
         }
-        Err(TableError::IdNotFound(table_id.0).into())
+        Err(TableError::IdNotFound(*table_id).into())
     }
 
     /// Returns an iterator,
@@ -2186,7 +2178,7 @@ mod tests {
     fn index_row(index_id: u32, table_id: u32, col_id: u32, name: &str, is_unique: bool) -> StIndexRow<String> {
         StIndexRow {
             index_id,
-            table_id,
+            table_id: TableId(table_id),
             cols: NonEmpty::new(ColId(col_id)),
             index_name: name.into(),
             is_unique,
@@ -2200,7 +2192,7 @@ mod tests {
         table_access: StAccess,
     ) -> StTableRow<String> {
         StTableRow {
-            table_id,
+            table_id: TableId(table_id),
             table_name: table_name.into(),
             table_type,
             table_access,
@@ -2215,7 +2207,7 @@ mod tests {
         is_autoinc: bool,
     ) -> StColumnRow<String> {
         StColumnRow {
-            table_id,
+            table_id: TableId(table_id),
             col_id: ColId(col_id),
             col_name: col_name.into(),
             col_type,
@@ -2225,7 +2217,7 @@ mod tests {
 
     fn column_schema(table_id: u32, id: u32, name: &str, ty: AlgebraicType, is_autoinc: bool) -> ColumnSchema {
         ColumnSchema {
-            table_id,
+            table_id: TableId(table_id),
             col_id: ColId(id),
             col_name: name.to_string(),
             col_type: ty,
@@ -2236,7 +2228,7 @@ mod tests {
     fn index_schema(id: u32, table_id: u32, col_id: u32, name: &str, is_unique: bool) -> IndexSchema {
         IndexSchema {
             index_id: id,
-            table_id,
+            table_id: TableId(table_id),
             cols: NonEmpty::new(ColId(col_id)),
             index_name: name.to_string(),
             is_unique,
@@ -2266,13 +2258,13 @@ mod tests {
             indexes: vec![
                 IndexDef::new(
                     "id_idx".into(),
-                    0, // Ignored
+                    TableId(0), // Ignored
                     ColId(0),
                     true,
                 ),
                 IndexDef::new(
                     "name_idx".into(),
-                    0, // Ignored
+                    TableId(0), // Ignored
                     ColId(1),
                     true,
                 ),
@@ -2395,10 +2387,10 @@ mod tests {
         assert_eq!(
             sequence_rows,
             vec![
-                StSequenceRow { sequence_id: 0, sequence_name: "table_id_seq".to_string(), table_id: 0, col_id: ColId(0), increment: 1, start: 6, min_value: 1, max_value: 4294967295, allocated: 4096 },
-                StSequenceRow { sequence_id: 1, sequence_name: "sequence_id_seq".to_string(), table_id: 2, col_id: ColId(0), increment: 1, start: 4, min_value: 1, max_value: 4294967295, allocated: 4096 },
-                StSequenceRow { sequence_id: 2, sequence_name: "index_id_seq".to_string(), table_id: 3, col_id: ColId(0), increment: 1, start: 6, min_value: 1, max_value: 4294967295, allocated: 4096 },
-                StSequenceRow { sequence_id: 3, sequence_name: "constraint_id_seq".to_string(), table_id: 4, col_id: ColId(0), increment: 1, start: 1, min_value: 1, max_value: 4294967295, allocated: 4096 },
+                StSequenceRow { sequence_id: 0, sequence_name: "table_id_seq".to_string(), table_id: TableId(0), col_id: ColId(0), increment: 1, start: 6, min_value: 1, max_value: 4294967295, allocated: 4096 },
+                StSequenceRow { sequence_id: 1, sequence_name: "sequence_id_seq".to_string(), table_id: TableId(2), col_id: ColId(0), increment: 1, start: 4, min_value: 1, max_value: 4294967295, allocated: 4096 },
+                StSequenceRow { sequence_id: 2, sequence_name: "index_id_seq".to_string(), table_id: TableId(3), col_id: ColId(0), increment: 1, start: 6, min_value: 1, max_value: 4294967295, allocated: 4096 },
+                StSequenceRow { sequence_id: 3, sequence_name: "constraint_id_seq".to_string(), table_id: TableId(4), col_id: ColId(0), increment: 1, start: 1, min_value: 1, max_value: 4294967295, allocated: 4096 },
             ]
         );
         let constraints_rows = datastore
@@ -2411,7 +2403,7 @@ mod tests {
         assert_eq!(
             constraints_rows,
             vec![
-                StConstraintRow{ constraint_id: 5, constraint_name: "ct_columns_table_id".to_string(), kind:  ColumnIndexAttribute::INDEXED, table_id: 1, columns: vec![0] },
+                StConstraintRow{ constraint_id: 5, constraint_name: "ct_columns_table_id".to_string(), kind:  ColumnIndexAttribute::INDEXED, table_id: TableId(1), columns: vec![0] },
             ]
         );
         datastore.rollback_mut_tx(tx);
@@ -2514,7 +2506,7 @@ mod tests {
         let schema = datastore.schema_for_table_mut_tx(&tx, table_id)?;
         #[rustfmt::skip]
         assert_eq!(schema, TableSchema {
-            table_id: table_id.0,
+            table_id,
             table_name: "Foo".into(),
             columns: vec![
                 // table_id, col_id: id, col_name, col_type, is_autoinc
@@ -2542,7 +2534,7 @@ mod tests {
         let schema = datastore.schema_for_table_mut_tx(&tx, table_id)?;
         #[rustfmt::skip]
         assert_eq!(schema, TableSchema {
-            table_id: table_id.0,
+            table_id,
             table_name: "Foo".into(),
             columns: vec![
                 // table_id, col_id: id, col_name, col_type, is_autoinc
@@ -2585,7 +2577,7 @@ mod tests {
             "no indexes should be left in the schema post-commit"
         );
 
-        datastore.create_index_mut_tx(&mut tx, IndexDef::new("id_idx".into(), 6, ColId(0), true))?;
+        datastore.create_index_mut_tx(&mut tx, IndexDef::new("id_idx".into(), TableId(6), ColId(0), true))?;
 
         let expected_indexes = vec![index_schema(8, 6, 0, "id_idx", true)];
         assert_eq!(
@@ -2768,7 +2760,7 @@ mod tests {
         datastore.insert_mut_tx(&mut tx, table_id, row)?;
         datastore.commit_mut_tx(tx)?;
         let mut tx = datastore.begin_mut_tx();
-        let index_def = IndexDef::new("age_idx".to_string(), table_id.0, ColId(2), true);
+        let index_def = IndexDef::new("age_idx".to_string(), table_id, ColId(2), true);
         datastore.create_index_mut_tx(&mut tx, index_def)?;
         let index_rows = datastore
             .iter_mut_tx(&tx, ST_INDEXES_ID)?
@@ -2811,7 +2803,7 @@ mod tests {
         datastore.insert_mut_tx(&mut tx, table_id, row)?;
         datastore.commit_mut_tx(tx)?;
         let mut tx = datastore.begin_mut_tx();
-        let index_def = IndexDef::new("age_idx".to_string(), table_id.0, ColId(2), true);
+        let index_def = IndexDef::new("age_idx".to_string(), table_id, ColId(2), true);
         datastore.create_index_mut_tx(&mut tx, index_def)?;
         datastore.commit_mut_tx(tx)?;
         let mut tx = datastore.begin_mut_tx();
@@ -2857,7 +2849,7 @@ mod tests {
         datastore.insert_mut_tx(&mut tx, table_id, row)?;
         datastore.commit_mut_tx(tx)?;
         let mut tx = datastore.begin_mut_tx();
-        let index_def = IndexDef::new("age_idx".to_string(), table_id.0, ColId(2), true);
+        let index_def = IndexDef::new("age_idx".to_string(), table_id, ColId(2), true);
         datastore.create_index_mut_tx(&mut tx, index_def)?;
         datastore.rollback_mut_tx(tx);
         let mut tx = datastore.begin_mut_tx();

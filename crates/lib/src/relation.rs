@@ -10,6 +10,7 @@ use crate::table::ColumnDef;
 use crate::DataKey;
 use spacetimedb_sats::algebraic_value::AlgebraicValue;
 use spacetimedb_sats::product_value::ProductValue;
+use spacetimedb_primitives::TableId;
 use spacetimedb_sats::satn::Satn;
 use spacetimedb_sats::{algebraic_type, AlgebraicType, ProductType, ProductTypeElement, Typespace, WithTypespace};
 
@@ -576,13 +577,13 @@ impl Relation for MemTable {
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord)]
 pub struct DbTable {
     pub head: Header,
-    pub table_id: u32,
+    pub table_id: TableId,
     pub table_type: StTableType,
     pub table_access: StAccess,
 }
 
 impl DbTable {
-    pub fn new(head: Header, table_id: u32, table_type: StTableType, table_access: StAccess) -> Self {
+    pub fn new(head: Header, table_id: TableId, table_type: StTableType, table_access: StAccess) -> Self {
         Self {
             head,
             table_id,

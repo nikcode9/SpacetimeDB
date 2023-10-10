@@ -4397,6 +4397,7 @@ dependencies = [
  "serde_with",
  "sha3",
  "spacetimedb-bindings-macro",
+ "spacetimedb-primitives",
  "spacetimedb-sats",
  "thiserror",
  "tracing",

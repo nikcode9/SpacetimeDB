@@ -11,7 +11,7 @@ use bytes::Bytes;
 use spacetimedb_lib::buffer::DecodeError;
 use spacetimedb_lib::identity::AuthCtx;
 use spacetimedb_lib::{bsatn, Address, IndexType, ModuleDef, VersionTuple};
-use spacetimedb_primitives::{IndexId, ColId};
+use spacetimedb_primitives::{IndexId, ColId, TableId};
 use spacetimedb_vm::expr::CrudExpr;
 
 use crate::client::ClientConnectionSender;
@@ -743,7 +743,7 @@ impl<T: WasmInstance> WasmModuleInstance<T> {
                 }
                 let index = IndexDef::new(
                     index.name.clone(),
-                    0, // Will be ignored
+                    TableId(0), // Will be ignored
                     ColId(col_id as u32),
                     col_attr.is_unique(),
                 );
@@ -753,7 +753,7 @@ impl<T: WasmInstance> WasmModuleInstance<T> {
                 // anyway.
                 let index = IndexDef::new(
                     format!("{}_{}_unique", table.name, col.col_name),
-                    0, // Will be ignored
+                    TableId(0), // Will be ignored
                     ColId(col_id as u32),
                     true,
                 );

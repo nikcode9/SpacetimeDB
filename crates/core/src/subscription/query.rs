@@ -159,7 +159,7 @@ mod tests {
     use spacetimedb_lib::error::ResultTest;
     use spacetimedb_lib::relation::FieldName;
     use spacetimedb_lib::Identity;
-    use spacetimedb_primitives::ColId;
+    use spacetimedb_primitives::{ColId, TableId};
     use spacetimedb_sats::{product, ProductType, ProductValue};
     use spacetimedb_vm::dsl::{db_table, mem_table, scalar};
     use spacetimedb_vm::operator::OpCmp;
@@ -170,7 +170,7 @@ mod tests {
         name: &str,
         schema: &[(&str, AlgebraicType)],
         indexes: &[(u32, &str)],
-    ) -> ResultTest<u32> {
+    ) -> ResultTest<TableId> {
         let table_name = name.to_string();
         let table_type = StTableType::User;
         let table_access = StAccess::Public;
@@ -186,7 +186,7 @@ mod tests {
 
         let indexes = indexes
             .iter()
-            .map(|(col_id, index_name)| IndexDef::new(index_name.to_string(), 0, ColId(*col_id), false))
+            .map(|(col_id, index_name)| IndexDef::new(index_name.to_string(), TableId(0), ColId(*col_id), false))
             .collect_vec();
 
         let schema = TableDef {

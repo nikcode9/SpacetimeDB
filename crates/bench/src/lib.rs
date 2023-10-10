@@ -1,7 +1,7 @@
 use crate::schemas::BenchTable;
 use spacetimedb::db::datastore::traits::{ColumnSchema, TableSchema};
 use spacetimedb_lib::auth::{StAccess, StTableType};
-use spacetimedb_primitives::ColId;
+use spacetimedb_primitives::{ColId, TableId};
 
 pub mod database;
 pub mod schemas;
@@ -17,7 +17,7 @@ pub(crate) fn create_schema<T: BenchTable>(table_name: &str) -> TableSchema {
         .into_iter()
         .enumerate()
         .map(|(pos, col)| ColumnSchema {
-            table_id: 0,
+            table_id: TableId(0),
             col_id: ColId(pos as u32),
             col_name: col.name.unwrap(),
             col_type: col.algebraic_type,
@@ -25,7 +25,7 @@ pub(crate) fn create_schema<T: BenchTable>(table_name: &str) -> TableSchema {
         });
 
     TableSchema {
-        table_id: 0,
+        table_id: TableId(0),
         table_name: table_name.to_string(),
         indexes: vec![],
         columns: columns.collect(),

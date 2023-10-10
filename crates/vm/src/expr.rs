@@ -6,7 +6,7 @@ use spacetimedb_lib::relation::{
 };
 use spacetimedb_lib::table::ProductTypeMeta;
 use spacetimedb_lib::Identity;
-use spacetimedb_primitives::ColId;
+use spacetimedb_primitives::{ColId, TableId};
 use spacetimedb_sats::algebraic_type::AlgebraicType;
 use spacetimedb_sats::algebraic_value::AlgebraicValue;
 use spacetimedb_sats::satn::Satn;
@@ -356,7 +356,7 @@ pub struct IndexJoin {
     pub probe_side: QueryExpr,
     pub probe_field: FieldName,
     pub index_header: Header,
-    pub index_table: u32,
+    pub index_table: TableId,
     pub index_col: ColId,
 }
 
@@ -525,7 +525,7 @@ pub enum Query {
     // Projects a set of columns.
     // The second argument is the table id for a qualified wildcard project.
     // If present, further optimzations are possible.
-    Project(Vec<FieldExpr>, Option<u32>),
+    Project(Vec<FieldExpr>, Option<TableId>),
     // A join of two relations (base or intermediate) based on equality.
     // Equivalent to a Nested Loop Join.
     // Its operands my use indexes but the join itself does not.
@@ -921,7 +921,7 @@ impl QueryExpr {
     // Appends a project operation to the query operator pipeline.
     // The `wildcard_table_id` represents a projection of the form `table.*`.
     // This is used to determine if an inner join can be rewritten as an index join.
-    pub fn with_project(self, cols: &[FieldExpr], wildcard_table_id: Option<u32>) -> Self {
+    pub fn with_project(self, cols: &[FieldExpr], wildcard_table_id: Option<TableId>) -> Self {
         let mut x = self;
         if !cols.is_empty() {
             x.query.push(Query::Project(cols.into(), wildcard_table_id));

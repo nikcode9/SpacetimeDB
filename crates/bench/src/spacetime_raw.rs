@@ -9,7 +9,7 @@ use spacetimedb::error::DBError;
 use spacetimedb::sql::execute::run;
 use spacetimedb_lib::identity::AuthCtx;
 use spacetimedb_lib::sats::AlgebraicValue;
-use spacetimedb_primitives::ColId;
+use spacetimedb_primitives::{ColId, TableId};
 use std::hint::black_box;
 use tempdir::TempDir;
 
@@ -23,7 +23,7 @@ impl BenchDatabase for SpacetimeRaw {
     fn name() -> &'static str {
         "stdb_raw"
     }
-    type TableId = u32;
+    type TableId = TableId;
 
     fn build(in_memory: bool, fsync: bool) -> ResultBench<Self>
     where

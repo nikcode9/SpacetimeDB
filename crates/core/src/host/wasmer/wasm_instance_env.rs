@@ -9,7 +9,7 @@ use crate::host::wasm_common::{
 };
 use bytes::Bytes;
 use itertools::Itertools;
-use spacetimedb_primitives::ColId;
+use spacetimedb_primitives::{ColId, TableId};
 use wasmer::{FunctionEnvMut, MemoryAccessError, RuntimeError, ValueType, WasmPtr};
 
 use crate::host::instance_env::InstanceEnv;
@@ -248,7 +248,7 @@ impl WasmInstanceEnv {
             // Insert the row into the DB. We get back the decoded version.
             // Then re-encode and write that back into WASM memory at `row`.
             // We're doing this because of autoinc.
-            let new_row = caller.data().instance_env.insert(table_id, &row_buffer)?;
+            let new_row = caller.data().instance_env.insert(TableId(table_id), &row_buffer)?;
             row_buffer.clear();
             new_row.encode(&mut row_buffer);
             assert_eq!(
@@ -289,14 +289,17 @@ impl WasmInstanceEnv {
     ) -> RtResult<u16> {
         Self::cvt_ret(caller, "delete_by_col_eq", out, |caller, mem| {
             let value = mem.read_bytes(&caller, value, value_len)?;
-            Ok(caller.data().instance_env.delete_by_col_eq(table_id, ColId(col_id), &value)?)
+            Ok(caller
+                .data()
+                .instance_env
+                .delete_by_col_eq(TableId(table_id), ColId(col_id), &value)?)
         })
     }
 
     /*
     /// Deletes the primary key pointed to at by `pk` in the table identified by `table_id`.
     #[tracing::instrument(skip_all)]
-    pub fn delete_pk(caller: FunctionEnvMut<'_, Self>, table_id: u32, pk: WasmPtr<u8>, pk_len: u32) -> RtResult<u16> {
+    pub fn delete_pk(caller: FunctionEnvMut<'_, Self>, table_id: TableId, pk: WasmPtr<u8>, pk_len: u32) -> RtResult<u16> {
         Self::cvt(caller, "delete_pk", |caller, mem| {
             // Read the primary key from WASM memory.
             let pk = mem.read_bytes(&caller, pk, pk_len)?;
@@ -311,7 +314,7 @@ impl WasmInstanceEnv {
     #[tracing::instrument(skip_all)]
     pub fn delete_value(
         caller: FunctionEnvMut<'_, Self>,
-        table_id: u32,
+        table_id: TableId,
         row: WasmPtr<u8>,
         row_len: u32,
     ) -> RtResult<u16> {
@@ -326,7 +329,7 @@ impl WasmInstanceEnv {
     #[tracing::instrument(skip_all)]
     pub fn delete_range(
         caller: FunctionEnvMut<'_, Self>,
-        table_id: u32,
+        table_id: TableId,
         cols: u32,
         range_start: WasmPtr<u8>,
         range_start_len: u32,
@@ -393,7 +396,7 @@ impl WasmInstanceEnv {
             let name = Self::read_string(&caller, mem, name, name_len)?;
 
             // Query the table id.
-            Ok(caller.data().instance_env.get_table_id(name)?)
+            Ok(caller.data().instance_env.get_table_id(name)?.0)
         })
     }
 
@@ -435,7 +438,7 @@ impl WasmInstanceEnv {
             caller
                 .data()
                 .instance_env
-                .create_index(index_name, table_id, index_type, cols)?;
+                .create_index(index_name, TableId(table_id), index_type, cols)?;
             Ok(())
         })
     }
@@ -474,7 +477,7 @@ impl WasmInstanceEnv {
             let data = caller
                 .data()
                 .instance_env
-                .iter_by_col_eq(table_id, ColId(col_id), &value)?;
+                .iter_by_col_eq(TableId(table_id), ColId(col_id), &value)?;
 
             // Insert the encoded + concatenated rows into a new buffer and return its id.
             Ok(caller.data_mut().buffers.insert(data.into()))
@@ -492,7 +495,7 @@ impl WasmInstanceEnv {
     pub fn iter_start(caller: FunctionEnvMut<'_, Self>, table_id: u32, out: WasmPtr<BufferIterIdx>) -> RtResult<u16> {
         Self::cvt_ret(caller, "iter_start", out, |mut caller, _mem| {
             // Construct the iterator.
-            let iter = caller.data().instance_env.iter(table_id);
+            let iter = caller.data().instance_env.iter(TableId(table_id));
             // TODO: make it so the above iterator doesn't lock the database for its whole lifetime
             let iter = iter.map_ok(Bytes::from).collect::<Vec<_>>().into_iter();
 
@@ -528,7 +531,7 @@ impl WasmInstanceEnv {
             let filter = caller.data().mem().read_bytes(&caller, filter, filter_len)?;
 
             // Construct the iterator.
-            let iter = caller.data().instance_env.iter_filtered(table_id, &filter)?;
+            let iter = caller.data().instance_env.iter_filtered(TableId(table_id), &filter)?;
             // TODO: make it so the above iterator doesn't lock the database for its whole lifetime
             let iter = iter.map(Bytes::from).map(Ok).collect::<Vec<_>>().into_iter();
 

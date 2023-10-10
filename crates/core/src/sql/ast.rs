@@ -19,7 +19,6 @@ use crate::error::{DBError, PlanError};
 use spacetimedb_lib::relation::{extract_table_field, FieldExpr, FieldName};
 use spacetimedb_vm::errors::ErrorVm;
 use spacetimedb_vm::expr::{ColumnOp, DbType, Expr};
-use spacetimedb_primitives::TableId;
 use spacetimedb_vm::operator::{OpCmp, OpLogic, OpQuery};
 use spacetimedb_vm::ops::parse::parse;
 
@@ -415,7 +414,7 @@ fn find_table(db: &RelationalDB, tx: &MutTxId, t: Table) -> Result<TableSchema, 
     let table_id = db
         .table_id_from_name(tx, &t.name)?
         .ok_or(PlanError::UnknownTable { table: t.name.clone() })?;
-    if !db.inner.table_id_exists(tx, &TableId(table_id)) {
+    if !db.inner.table_id_exists(tx, &table_id) {
         return Err(PlanError::UnknownTable { table: t.name });
     }
     db.schema_for_table(tx, table_id)
