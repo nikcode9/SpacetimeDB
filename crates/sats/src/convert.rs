@@ -1,4 +1,4 @@
-use crate::{AlgebraicType, AlgebraicValue, ArrayType, BuiltinType, MapType, ProductType, ProductValue};
+use crate::{AlgebraicType, AlgebraicValue, MapType, ProductType, ProductValue};
 
 impl crate::Value for AlgebraicValue {
     type Type = AlgebraicType;
@@ -22,15 +22,9 @@ impl From<AlgebraicType> for ProductType {
     }
 }
 
-impl From<ArrayType> for AlgebraicType {
-    fn from(x: ArrayType) -> Self {
-        BuiltinType::Array(x).into()
-    }
-}
-
 impl From<MapType> for AlgebraicType {
     fn from(x: MapType) -> Self {
-        BuiltinType::Map(Box::new(x)).into()
+        Box::new(x).into()
     }
 }
 
