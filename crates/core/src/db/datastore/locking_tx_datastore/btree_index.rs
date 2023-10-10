@@ -171,7 +171,7 @@ impl BTreeIndex {
 impl From<&BTreeIndex> for IndexSchema {
     fn from(x: &BTreeIndex) -> Self {
         IndexSchema {
-            index_id: x.index_id.0,
+            index_id: x.index_id,
             table_id: x.table_id,
             cols: x.cols.clone(),
             is_unique: x.is_unique,

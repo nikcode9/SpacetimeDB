@@ -543,7 +543,7 @@ impl Inner {
             let index_row = StIndexRow::try_from(&row)?;
             let table = self.committed_state.get_table(&index_row.table_id).unwrap();
             let mut index = BTreeIndex::new(
-                IndexId(index_row.index_id),
+                index_row.index_id,
                 index_row.table_id,
                 index_row.cols.clone(),
                 index_row.index_name.into(),
@@ -897,7 +897,7 @@ impl Inner {
         for data_ref in rows {
             let row = data_ref.view();
             let el = StIndexRow::try_from(row)?;
-            self.drop_index(IndexId(el.index_id))?;
+            self.drop_index(el.index_id)?;
         }
 
         // Remove the table's sequences from st_sequences.
@@ -974,7 +974,7 @@ impl Inner {
         // NOTE: Because st_indexes has a unique index on index_name, this will
         // fail if the index already exists.
         let row = StIndexRow {
-            index_id: 0, // Autogen'd
+            index_id: IndexId(0), // Autogen'd
             table_id: index.table_id,
             cols: index.cols.clone(),
             index_name: &index.name,
@@ -986,7 +986,7 @@ impl Inner {
         if !self.table_exists(&index.table_id) {
             return Err(TableError::IdNotFound(index.table_id).into());
         }
-        self.create_index_internal(IndexId(index_id), &index)?;
+        self.create_index_internal(index_id, &index)?;
 
         log::trace!(
             "INDEX CREATED: {} for table: {} and col(s): {:?}",
@@ -994,7 +994,7 @@ impl Inner {
             index.table_id,
             index.cols
         );
-        Ok(IndexId(index_id))
+        Ok(index_id)
     }
 
     fn create_index_internal(&mut self, index_id: IndexId, index: &IndexDef) -> super::Result<()> {
@@ -1039,7 +1039,7 @@ impl Inner {
             cols: index.cols.clone(),
             index_name: index.name.to_string(),
             is_unique: index.is_unique,
-            index_id: index_id.0,
+            index_id,
         });
 
         insert_table.indexes.insert(index.cols.clone(), insert_index);
@@ -2177,7 +2177,7 @@ mod tests {
 
     fn index_row(index_id: u32, table_id: u32, col_id: u32, name: &str, is_unique: bool) -> StIndexRow<String> {
         StIndexRow {
-            index_id,
+            index_id: IndexId(index_id),
             table_id: TableId(table_id),
             cols: NonEmpty::new(ColId(col_id)),
             index_name: name.into(),
@@ -2227,7 +2227,7 @@ mod tests {
 
     fn index_schema(id: u32, table_id: u32, col_id: u32, name: &str, is_unique: bool) -> IndexSchema {
         IndexSchema {
-            index_id: id,
+            index_id: IndexId(id),
             table_id: TableId(table_id),
             cols: NonEmpty::new(ColId(col_id)),
             index_name: name.to_string(),
@@ -2403,7 +2403,7 @@ mod tests {
         assert_eq!(
             constraints_rows,
             vec![
-                StConstraintRow{ constraint_id: 5, constraint_name: "ct_columns_table_id".to_string(), kind:  ColumnIndexAttribute::INDEXED, table_id: TableId(1), columns: vec![0] },
+                StConstraintRow{ constraint_id: IndexId(5), constraint_name: "ct_columns_table_id".to_string(), kind:  ColumnIndexAttribute::INDEXED, table_id: TableId(1), columns: vec![ColId(0)] },
             ]
         );
         datastore.rollback_mut_tx(tx);
@@ -2563,7 +2563,7 @@ mod tests {
         let schema = datastore.schema_for_table_mut_tx(&tx, table_id)?;
 
         for index in schema.indexes {
-            datastore.drop_index_mut_tx(&mut tx, IndexId(index.index_id))?;
+            datastore.drop_index_mut_tx(&mut tx, index.index_id)?;
         }
         assert!(
             datastore.schema_for_table_mut_tx(&tx, table_id)?.indexes.is_empty(),

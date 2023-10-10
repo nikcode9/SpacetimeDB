@@ -39,7 +39,7 @@ pub struct SequenceDef {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IndexSchema {
-    pub(crate) index_id: u32,
+    pub(crate) index_id: IndexId,
     pub(crate) table_id: TableId,
     pub(crate) index_name: String,
     pub(crate) is_unique: bool,
@@ -140,11 +140,11 @@ impl From<ColumnSchema> for ColumnDef {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConstraintSchema {
-    pub(crate) constraint_id: u32,
+    pub(crate) constraint_id: IndexId,
     pub(crate) constraint_name: String,
     pub(crate) kind: ColumnIndexAttribute,
     pub(crate) table_id: TableId,
-    pub(crate) columns: Vec<u32>,
+    pub(crate) columns: Vec<ColId>,
 }
 
 /// This type is just the [ConstraintSchema] without the autoinc fields
@@ -153,7 +153,7 @@ pub struct ConstraintDef {
     pub(crate) constraint_name: String,
     pub(crate) kind: ColumnIndexAttribute,
     pub(crate) table_id: TableId,
-    pub(crate) columns: Vec<u32>,
+    pub(crate) columns: Vec<ColId>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

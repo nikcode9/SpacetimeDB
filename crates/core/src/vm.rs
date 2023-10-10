@@ -716,7 +716,7 @@ pub(crate) mod tests {
             p,
             ST_INDEXES_NAME,
             (&StIndexRow {
-                index_id: index_id.0,
+                index_id,
                 index_name: "idx_1",
                 table_id,
                 cols: NonEmpty::new(ColId(0)),

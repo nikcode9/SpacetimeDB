@@ -11,7 +11,7 @@ use bytes::Bytes;
 use spacetimedb_lib::buffer::DecodeError;
 use spacetimedb_lib::identity::AuthCtx;
 use spacetimedb_lib::{bsatn, Address, IndexType, ModuleDef, VersionTuple};
-use spacetimedb_primitives::{IndexId, ColId, TableId};
+use spacetimedb_primitives::{ColId, IndexId, TableId};
 use spacetimedb_vm::expr::CrudExpr;
 
 use crate::client::ClientConnectionSender;
@@ -836,10 +836,10 @@ impl<T: WasmInstance> WasmModuleInstance<T> {
                         match known_indexes.remove(&index_def.name) {
                             None => indexes_to_create.push(index_def),
                             Some(known_index) => {
-                                let known_id = IndexId(known_index.index_id);
+                                let known_index_id = known_index.index_id;
                                 let known_index_def = IndexDef::from(known_index);
                                 if known_index_def != index_def {
-                                    indexes_to_drop.push(known_id);
+                                    indexes_to_drop.push(known_index_id);
                                     indexes_to_create.push(index_def);
                                 }
                             }
@@ -848,7 +848,7 @@ impl<T: WasmInstance> WasmModuleInstance<T> {
 
                     // Indexes not in the proposed schema shall be dropped.
                     for index in known_indexes.into_values() {
-                        indexes_to_drop.push(IndexId(index.index_id));
+                        indexes_to_drop.push(index.index_id);
                     }
                 }
             } else {

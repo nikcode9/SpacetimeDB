@@ -6,7 +6,7 @@ use nonempty::NonEmpty;
 use once_cell::sync::Lazy;
 use spacetimedb_lib::auth::{StAccess, StTableType};
 use spacetimedb_lib::{ColumnIndexAttribute, Hash};
-use spacetimedb_primitives::{ColId, SequenceId, TableId};
+use spacetimedb_primitives::{ColId, IndexId, SequenceId, TableId};
 use spacetimedb_sats::{
     impl_deserialize, impl_serialize, product, product_value::InvalidFieldError, AlgebraicType, AlgebraicValue,
     ArrayValue, ProductType, ProductValue,
@@ -38,12 +38,12 @@ pub(crate) const SEQUENCE_ID_SEQUENCE_ID: SequenceId = SequenceId(1);
 pub(crate) const INDEX_ID_SEQUENCE_ID: SequenceId = SequenceId(2);
 pub(crate) const CONSTRAINT_ID_SEQUENCE_ID: SequenceId = SequenceId(3);
 
-pub(crate) const ST_TABLE_ID_INDEX_ID: u32 = 0;
-pub(crate) const ST_TABLE_NAME_INDEX_ID: u32 = 3;
-pub(crate) const ST_INDEX_ID_INDEX_ID: u32 = 1;
-pub(crate) const ST_SEQUENCE_ID_INDEX_ID: u32 = 2;
-pub(crate) const ST_CONSTRAINT_ID_INDEX_ID: u32 = 4;
-pub(crate) const ST_CONSTRAINT_ID_INDEX_HACK: u32 = 5;
+pub(crate) const ST_TABLE_ID_INDEX_ID: IndexId = IndexId(0);
+pub(crate) const ST_TABLE_NAME_INDEX_ID: IndexId = IndexId(3);
+pub(crate) const ST_INDEX_ID_INDEX_ID: IndexId = IndexId(1);
+pub(crate) const ST_SEQUENCE_ID_INDEX_ID: IndexId = IndexId(2);
+pub(crate) const ST_CONSTRAINT_ID_INDEX_ID: IndexId = IndexId(4);
+pub(crate) const ST_CONSTRAINT_ID_INDEX_HACK: IndexId = IndexId(5);
 pub(crate) struct SystemTables {}
 
 impl SystemTables {
@@ -292,7 +292,7 @@ pub fn st_columns_schema() -> TableSchema {
             kind: ColumnIndexAttribute::INDEXED,
             table_id: ST_COLUMNS_ID,
             //TODO: Change to multi-columns when PR for it land: StColumnFields::ColId as u32
-            columns: vec![StColumnFields::TableId as u32],
+            columns: vec![StColumnFields::TableId.col_id()],
         }],
         table_type: StTableType::System,
         table_access: StAccess::Public,
@@ -304,7 +304,7 @@ pub static ST_COLUMNS_ROW_TYPE: Lazy<ProductType> =
 
 /// System Table [ST_INDEXES]
 ///
-/// | index_id: u32 | table_id: TableId | cols: NonEmpty<u32> | index_name: String | is_unique: bool      |
+/// | index_id: IndexId | table_id: TableId | cols: NonEmpty<ColId> | index_name: String | is_unique: bool      |
 /// |---------------|---------------|---------------------|--------------------|----------------------|
 /// | 1             | 1             | [1]                 | "ix_sample"        | 0                    |
 pub fn st_indexes_schema() -> TableSchema {
@@ -697,7 +697,7 @@ impl<Name: AsRef<str>> From<&StColumnRow<Name>> for ProductValue {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct StIndexRow<Name: AsRef<str>> {
-    pub(crate) index_id: u32,
+    pub(crate) index_id: IndexId,
     pub(crate) table_id: TableId,
     pub(crate) cols: NonEmpty<ColId>,
     pub(crate) index_name: Name,
@@ -719,7 +719,7 @@ impl StIndexRow<&str> {
 impl<'a> TryFrom<&'a ProductValue> for StIndexRow<&'a str> {
     type Error = DBError;
     fn try_from(row: &'a ProductValue) -> Result<StIndexRow<&'a str>, DBError> {
-        let index_id = row.field_as_u32(StIndexFields::IndexId as usize, None)?;
+        let index_id = IndexId(row.field_as_u32(StIndexFields::IndexId as usize, None)?);
         let table_id = TableId(row.field_as_u32(StIndexFields::TableId as usize, None)?);
         let cols = row.field_as_array(StIndexFields::Cols as usize, None)?;
         let cols = if let ArrayValue::U32(x) = cols {
@@ -845,11 +845,11 @@ impl<'a> From<&StSequenceRow<&'a str>> for SequenceSchema {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct StConstraintRow<Name: AsRef<str>> {
-    pub(crate) constraint_id: u32,
+    pub(crate) constraint_id: IndexId,
     pub(crate) constraint_name: Name,
     pub(crate) kind: ColumnIndexAttribute,
     pub(crate) table_id: TableId,
-    pub(crate) columns: Vec<u32>,
+    pub(crate) columns: Vec<ColId>,
 }
 
 impl StConstraintRow<&str> {
@@ -867,14 +867,14 @@ impl StConstraintRow<&str> {
 impl<'a> TryFrom<&'a ProductValue> for StConstraintRow<&'a str> {
     type Error = DBError;
     fn try_from(row: &'a ProductValue) -> Result<StConstraintRow<&'a str>, DBError> {
-        let constraint_id = row.field_as_u32(StConstraintFields::ConstraintId as usize, None)?;
+        let constraint_id = IndexId(row.field_as_u32(StConstraintFields::ConstraintId as usize, None)?);
         let constraint_name = row.field_as_str(StConstraintFields::ConstraintName as usize, None)?;
         let kind = row.field_as_u8(StConstraintFields::Kind as usize, None)?;
         let kind = ColumnIndexAttribute::try_from(kind).expect("Fail to decode ColumnIndexAttribute");
         let table_id = TableId(row.field_as_u32(StConstraintFields::TableId as usize, None)?);
         let columns = row.field_as_array(StConstraintFields::Columns as usize, None)?;
         let columns = if let ArrayValue::U32(x) = columns {
-            x.clone()
+            x.iter().copied().map(ColId).collect()
         } else {
             panic!()
         };
@@ -896,7 +896,7 @@ impl<Name: AsRef<str>> From<&StConstraintRow<Name>> for ProductValue {
             AlgebraicValue::String(x.constraint_name.as_ref().to_string()),
             x.kind.bits(),
             x.table_id,
-            ArrayValue::from(x.columns.clone())
+            ArrayValue::from(x.columns.iter().copied().map(|x| x.0).collect::<Vec<_>>())
         ]
     }
 }
