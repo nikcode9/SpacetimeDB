@@ -13,7 +13,7 @@ use super::{system_tables::StTableRow, Result};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SequenceSchema {
-    pub(crate) sequence_id: u32,
+    pub(crate) sequence_id: SequenceId,
     pub(crate) sequence_name: String,
     pub(crate) table_id: TableId,
     pub(crate) col_id: ColId,

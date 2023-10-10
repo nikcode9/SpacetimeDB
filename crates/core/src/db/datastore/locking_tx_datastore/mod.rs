@@ -425,7 +425,7 @@ impl Inner {
                     &st_sequences_schema(),
                 );
                 let row = StSequenceRow {
-                    sequence_id: seq_id.0,
+                    sequence_id: seq_id,
                     sequence_name: &format!("{}_seq", col.col_name),
                     table_id: col.table_id,
                     col_id: col.col_id,
@@ -529,9 +529,7 @@ impl Inner {
                 seq.value = sequence.allocated + 1;
             }
 
-            self.sequence_state
-                .sequences
-                .insert(SequenceId(sequence.sequence_id), seq);
+            self.sequence_state.sequences.insert(sequence.sequence_id, seq);
         }
         Ok(())
     }
@@ -659,7 +657,7 @@ impl Inner {
         // NOTE: Because st_sequences has a unique index on sequence_name, this will
         // fail if the table already exists.
         let sequence_row = StSequenceRow {
-            sequence_id: 0, // autogen'd
+            sequence_id: SequenceId(0), // autogen'd
             sequence_name: seq.sequence_name.as_str(),
             table_id: seq.table_id,
             col_id: seq.col_id,
@@ -672,7 +670,7 @@ impl Inner {
         let row = (&sequence_row).into();
         let result = self.insert(ST_SEQUENCES_ID, row)?;
         let sequence_row = StSequenceRow::try_from(&result)?;
-        let sequence_id = SequenceId(sequence_row.sequence_id);
+        let sequence_id = sequence_row.sequence_id;
 
         let schema = (&sequence_row).into();
         self.sequence_state.sequences.insert(sequence_id, Sequence::new(schema));
@@ -908,7 +906,7 @@ impl Inner {
         for data_ref in rows {
             let row = data_ref.view();
             let el = StSequenceRow::try_from(row)?;
-            self.drop_sequence(SequenceId(el.sequence_id))?;
+            self.drop_sequence(el.sequence_id)?;
         }
 
         // Remove the table's columns from st_columns.
@@ -1198,7 +1196,7 @@ impl Inner {
                     if seq_row.col_id != col.col_id {
                         continue;
                     }
-                    let sequence_value = self.get_next_sequence_value(SequenceId(seq_row.sequence_id))?;
+                    let sequence_value = self.get_next_sequence_value(seq_row.sequence_id)?;
                     row.elements[col.col_id.idx()] = Self::sequence_value_to_algebraic_value(
                         &schema.table_name,
                         &col.col_name,
@@ -2164,7 +2162,7 @@ mod tests {
         error::ResultTest,
         ColumnIndexAttribute,
     };
-    use spacetimedb_primitives::{IndexId, TableId};
+    use spacetimedb_primitives::{IndexId, TableId, SequenceId};
     use spacetimedb_sats::{product, AlgebraicType, AlgebraicValue, ProductValue};
 
     fn u32_str_u32(a: u32, b: &str, c: u32) -> ProductValue {
@@ -2387,10 +2385,10 @@ mod tests {
         assert_eq!(
             sequence_rows,
             vec![
-                StSequenceRow { sequence_id: 0, sequence_name: "table_id_seq".to_string(), table_id: TableId(0), col_id: ColId(0), increment: 1, start: 6, min_value: 1, max_value: 4294967295, allocated: 4096 },
-                StSequenceRow { sequence_id: 1, sequence_name: "sequence_id_seq".to_string(), table_id: TableId(2), col_id: ColId(0), increment: 1, start: 4, min_value: 1, max_value: 4294967295, allocated: 4096 },
-                StSequenceRow { sequence_id: 2, sequence_name: "index_id_seq".to_string(), table_id: TableId(3), col_id: ColId(0), increment: 1, start: 6, min_value: 1, max_value: 4294967295, allocated: 4096 },
-                StSequenceRow { sequence_id: 3, sequence_name: "constraint_id_seq".to_string(), table_id: TableId(4), col_id: ColId(0), increment: 1, start: 1, min_value: 1, max_value: 4294967295, allocated: 4096 },
+                StSequenceRow { sequence_id: SequenceId(0), sequence_name: "table_id_seq".to_string(), table_id: TableId(0), col_id: ColId(0), increment: 1, start: 6, min_value: 1, max_value: 4294967295, allocated: 4096 },
+                StSequenceRow { sequence_id: SequenceId(1), sequence_name: "sequence_id_seq".to_string(), table_id: TableId(2), col_id: ColId(0), increment: 1, start: 4, min_value: 1, max_value: 4294967295, allocated: 4096 },
+                StSequenceRow { sequence_id: SequenceId(2), sequence_name: "index_id_seq".to_string(), table_id: TableId(3), col_id: ColId(0), increment: 1, start: 6, min_value: 1, max_value: 4294967295, allocated: 4096 },
+                StSequenceRow { sequence_id: SequenceId(3), sequence_name: "constraint_id_seq".to_string(), table_id: TableId(4), col_id: ColId(0), increment: 1, start: 1, min_value: 1, max_value: 4294967295, allocated: 4096 },
             ]
         );
         let constraints_rows = datastore

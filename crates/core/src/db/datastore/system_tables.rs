@@ -758,7 +758,7 @@ impl<Name: AsRef<str>> From<&StIndexRow<Name>> for ProductValue {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct StSequenceRow<Name: AsRef<str>> {
-    pub(crate) sequence_id: u32,
+    pub(crate) sequence_id: SequenceId,
     pub(crate) sequence_name: Name,
     pub(crate) table_id: TableId,
     pub(crate) col_id: ColId,
@@ -788,7 +788,7 @@ impl<Name: AsRef<str>> StSequenceRow<Name> {
 impl<'a> TryFrom<&'a ProductValue> for StSequenceRow<&'a str> {
     type Error = DBError;
     fn try_from(row: &'a ProductValue) -> Result<StSequenceRow<&'a str>, DBError> {
-        let sequence_id = row.field_as_u32(StSequenceFields::SequenceId as usize, None)?;
+        let sequence_id = SequenceId(row.field_as_u32(StSequenceFields::SequenceId as usize, None)?);
         let sequence_name = row.field_as_str(StSequenceFields::SequenceName as usize, None)?;
         let table_id = TableId(row.field_as_u32(StSequenceFields::TableId as usize, None)?);
         let col_id = ColId(row.field_as_u32(StSequenceFields::ColId as usize, None)?);

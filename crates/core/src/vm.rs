@@ -518,7 +518,7 @@ pub(crate) mod tests {
     use nonempty::NonEmpty;
     use spacetimedb_lib::error::ResultTest;
     use spacetimedb_lib::relation::{DbTable, FieldName};
-    use spacetimedb_primitives::TableId;
+    use spacetimedb_primitives::{TableId, SequenceId};
     use spacetimedb_sats::{product, AlgebraicType, ProductType, ProductValue};
     use spacetimedb_vm::dsl::*;
     use spacetimedb_vm::eval::run_ast;
@@ -748,7 +748,7 @@ pub(crate) mod tests {
             p,
             ST_SEQUENCES_NAME,
             (&StSequenceRow {
-                sequence_id: 1,
+                sequence_id: SequenceId(1),
                 sequence_name: "sequence_id_seq",
                 table_id: TableId(2),
                 col_id: ColId(0),

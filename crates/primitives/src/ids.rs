@@ -21,7 +21,7 @@ impl ColId {
 #[repr(transparent)]
 pub struct IndexId(pub u32);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
 #[repr(transparent)]
 pub struct SequenceId(pub u32);
 
