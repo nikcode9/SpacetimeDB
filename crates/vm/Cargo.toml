@@ -8,6 +8,7 @@ description = "A VM for SpacetimeDB"
 [dependencies]
 spacetimedb-sats= { path = "../sats", version = "0.7.0" }
 spacetimedb-lib = { path = "../lib", version = "0.7.0" }
+spacetimedb-primitives = { path = "../primitives", version = "0.7.0" }
 
 anyhow.workspace = true
 derive_more.workspace = true

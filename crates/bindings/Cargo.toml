@@ -19,6 +19,8 @@ getrandom = ["spacetimedb-bindings-sys/getrandom"]
 spacetimedb-bindings-sys = { path = "../bindings-sys", version = "0.7.0" }
 spacetimedb-lib = { path = "../lib", default-features = false, version = "0.7.0"}
 spacetimedb-bindings-macro = { path = "../bindings-macro", version = "0.7.0"}
+spacetimedb-primitives = { path = "../primitives" }
+
 
 derive_more.workspace = true
 log.workspace = true

@@ -154,12 +154,12 @@ mod tests {
     use crate::subscription::subscription::QuerySet;
     use crate::vm::tests::create_table_with_rows;
     use itertools::Itertools;
-    use nonempty::NonEmpty;
     use spacetimedb_lib::auth::{StAccess, StTableType};
     use spacetimedb_lib::data_key::ToDataKey;
     use spacetimedb_lib::error::ResultTest;
     use spacetimedb_lib::relation::FieldName;
     use spacetimedb_lib::Identity;
+    use spacetimedb_primitives::ColId;
     use spacetimedb_sats::{product, ProductType, ProductValue};
     use spacetimedb_vm::dsl::{db_table, mem_table, scalar};
     use spacetimedb_vm::operator::OpCmp;
@@ -186,12 +186,7 @@ mod tests {
 
         let indexes = indexes
             .iter()
-            .map(|(col_id, index_name)| IndexDef {
-                table_id: 0,
-                cols: NonEmpty::new(*col_id),
-                name: index_name.to_string(),
-                is_unique: false,
-            })
+            .map(|(col_id, index_name)| IndexDef::new(index_name.to_string(), 0, ColId(*col_id), false))
             .collect_vec();
 
         let schema = TableDef {

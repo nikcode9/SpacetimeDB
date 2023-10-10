@@ -9,6 +9,7 @@ use crate::host::wasm_common::{
 };
 use bytes::Bytes;
 use itertools::Itertools;
+use spacetimedb_primitives::ColId;
 use wasmer::{FunctionEnvMut, MemoryAccessError, RuntimeError, ValueType, WasmPtr};
 
 use crate::host::instance_env::InstanceEnv;
@@ -288,7 +289,7 @@ impl WasmInstanceEnv {
     ) -> RtResult<u16> {
         Self::cvt_ret(caller, "delete_by_col_eq", out, |caller, mem| {
             let value = mem.read_bytes(&caller, value, value_len)?;
-            Ok(caller.data().instance_env.delete_by_col_eq(table_id, col_id, &value)?)
+            Ok(caller.data().instance_env.delete_by_col_eq(table_id, ColId(col_id), &value)?)
         })
     }
 
@@ -470,7 +471,10 @@ impl WasmInstanceEnv {
             let value = mem.read_bytes(&caller, val, val_len)?;
 
             // Find the relevant rows.
-            let data = caller.data().instance_env.iter_by_col_eq(table_id, col_id, &value)?;
+            let data = caller
+                .data()
+                .instance_env
+                .iter_by_col_eq(table_id, ColId(col_id), &value)?;
 
             // Insert the encoded + concatenated rows into a new buffer and return its id.
             Ok(caller.data_mut().buffers.insert(data.into()))

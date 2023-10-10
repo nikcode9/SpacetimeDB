@@ -18,6 +18,7 @@ use spacetimedb_lib::filter::CmpArgs;
 use spacetimedb_lib::identity::AuthCtx;
 use spacetimedb_lib::operator::OpQuery;
 use spacetimedb_lib::relation::{FieldExpr, FieldName};
+use spacetimedb_primitives::ColId;
 use spacetimedb_sats::{ProductType, Typespace};
 use spacetimedb_vm::expr::{Code, ColumnOp};
 
@@ -144,7 +145,7 @@ impl InstanceEnv {
     ///
     /// Returns an error if no columns were deleted or if the column wasn't found.
     #[tracing::instrument(skip(self, value))]
-    pub fn delete_by_col_eq(&self, table_id: u32, col_id: u32, value: &[u8]) -> Result<u32, NodesError> {
+    pub fn delete_by_col_eq(&self, table_id: u32, col_id: ColId, value: &[u8]) -> Result<u32, NodesError> {
         let stdb = &*self.dbic.relational_db;
         let tx = &mut *self.get_tx()?;
 
@@ -280,7 +281,7 @@ impl InstanceEnv {
 
         let cols = NonEmpty::from_slice(&col_ids)
             .expect("Attempt to create an index with zero columns")
-            .map(|x| x as u32);
+            .map(|x| ColId(x as u32));
 
         let is_unique = stdb.column_attrs(tx, table_id, &cols)?.is_unique();
 
@@ -304,7 +305,7 @@ impl InstanceEnv {
     /// Matching is defined by decoding of `value` to an `AlgebraicValue`
     /// according to the column's schema and then `Ord for AlgebraicValue`.
     #[tracing::instrument(skip_all)]
-    pub fn iter_by_col_eq(&self, table_id: u32, col_id: u32, value: &[u8]) -> Result<Vec<u8>, NodesError> {
+    pub fn iter_by_col_eq(&self, table_id: u32, col_id: ColId, value: &[u8]) -> Result<Vec<u8>, NodesError> {
         let stdb = &*self.dbic.relational_db;
         let tx = &mut *self.get_tx()?;
 

@@ -9,6 +9,7 @@ use spacetimedb::error::DBError;
 use spacetimedb::sql::execute::run;
 use spacetimedb_lib::identity::AuthCtx;
 use spacetimedb_lib::sats::AlgebraicValue;
+use spacetimedb_primitives::ColId;
 use std::hint::black_box;
 use tempdir::TempDir;
 
@@ -46,14 +47,14 @@ impl BenchDatabase for SpacetimeRaw {
             match index_strategy {
                 IndexStrategy::Unique => {
                     self.db
-                        .create_index(tx, IndexDef::new("id".to_string(), table_id, 0, true))?;
+                        .create_index(tx, IndexDef::new("id".to_string(), table_id, ColId(0), true))?;
                 }
                 IndexStrategy::NonUnique => (),
                 IndexStrategy::MultiIndex => {
                     for (i, column) in T::product_type().elements.iter().enumerate() {
                         self.db.create_index(
                             tx,
-                            IndexDef::new(column.name.clone().unwrap(), table_id, i as u32, false),
+                            IndexDef::new(column.name.clone().unwrap(), table_id, ColId(i as u32), false),
                         )?;
                     }
                 }
@@ -117,7 +118,7 @@ impl BenchDatabase for SpacetimeRaw {
     fn filter<T: BenchTable>(
         &mut self,
         table: &TableSchema,
-        column_index: u32,
+        column_index: ColId,
         value: AlgebraicValue,
     ) -> ResultBench<()> {
         self.db.with_auto_commit(|tx| {
@@ -141,11 +142,11 @@ impl BenchDatabase for SpacetimeRaw {
     fn sql_where<T: BenchTable>(
         &mut self,
         table: &TableSchema,
-        column_index: u32,
+        column_index: ColId,
         value: AlgebraicValue,
     ) -> ResultBench<()> {
         self.db.with_auto_commit(|tx| {
-            let column = &table.columns[column_index as usize].col_name;
+            let column = &table.columns[column_index.idx()].col_name;
 
             let table_name = &table.table_name;
 

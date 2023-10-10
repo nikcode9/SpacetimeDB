@@ -1,8 +1,7 @@
 use super::commit_log::{CommitLog, CommitLogView};
 use super::datastore::locking_tx_datastore::{Data, DataRef, Iter, IterByColEq, IterByColRange, MutTxId, RowId};
 use super::datastore::traits::{
-    ColId, DataRow, IndexDef, IndexId, MutProgrammable, MutTx, MutTxDatastore, Programmable, SequenceDef, SequenceId,
-    TableDef, TableId, TableSchema, TxData,
+    DataRow, IndexDef, MutProgrammable, MutTx, MutTxDatastore, Programmable, SequenceDef, TableDef, TableSchema, TxData,
 };
 use super::message_log::MessageLog;
 use super::ostorage::memory_object_db::MemoryObjectDB;
@@ -21,6 +20,7 @@ use nonempty::NonEmpty;
 use prometheus::HistogramVec;
 use spacetimedb_lib::ColumnIndexAttribute;
 use spacetimedb_lib::{data_key::ToDataKey, PrimaryKey};
+use spacetimedb_primitives::{ColId, IndexId, SequenceId, TableId};
 use spacetimedb_sats::{AlgebraicType, AlgebraicValue, ProductType, ProductValue};
 use std::fs::{create_dir_all, File};
 use std::ops::RangeBounds;
@@ -214,12 +214,12 @@ impl RelationalDB {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn schema_for_column(&self, tx: &MutTxId, table_id: u32, col_id: u32) -> Result<AlgebraicType, DBError> {
+    pub fn schema_for_column(&self, tx: &MutTxId, table_id: u32, col_id: ColId) -> Result<AlgebraicType, DBError> {
         let schema = self.row_schema_for_table(tx, table_id)?;
         let col = schema
             .elements
-            .get(col_id as usize)
-            .ok_or(TableError::ColumnNotFound(col_id))?;
+            .get(col_id.idx())
+            .ok_or(TableError::ColumnNotFound(col_id.0))?;
         Ok(col.algebraic_type.clone())
     }
 
@@ -227,7 +227,7 @@ impl RelationalDB {
         &self,
         tx: &MutTxId,
         table_id: u32,
-        col_id: u32,
+        col_id: ColId,
         bytes: &[u8],
     ) -> Result<AlgebraicValue, DBError> {
         let schema = self.schema_for_column(tx, table_id, col_id)?;
@@ -405,7 +405,7 @@ impl RelationalDB {
         &self,
         tx: &mut MutTxId,
         table_id: u32,
-        cols: &NonEmpty<u32>,
+        cols: &NonEmpty<ColId>,
     ) -> Result<ColumnIndexAttribute, DBError> {
         let table = self.inner.schema_for_table_mut_tx(tx, TableId(table_id))?;
         let columns = table.project_not_empty(cols)?;
@@ -478,11 +478,10 @@ impl RelationalDB {
         &'a self,
         tx: &'a MutTxId,
         table_id: u32,
-        col_id: u32,
+        col_id: ColId,
         value: AlgebraicValue,
     ) -> Result<IterByColEq<'a>, DBError> {
-        self.inner
-            .iter_by_col_eq_mut_tx(tx, TableId(table_id), ColId(col_id), value)
+        self.inner.iter_by_col_eq_mut_tx(tx, TableId(table_id), col_id, value)
     }
 
     /// Returns an iterator,
@@ -494,11 +493,11 @@ impl RelationalDB {
         &'a self,
         tx: &'a MutTxId,
         table_id: u32,
-        col_id: u32,
+        col_id: ColId,
         range: R,
     ) -> Result<IterByColRange<'a, R>, DBError> {
         self.inner
-            .iter_by_col_range_mut_tx(tx, TableId(table_id), ColId(col_id), range)
+            .iter_by_col_range_mut_tx(tx, TableId(table_id), col_id, range)
     }
 
     #[tracing::instrument(skip(self, tx, row))]
@@ -638,7 +637,7 @@ pub(crate) mod tests_utils {
 mod tests {
     #![allow(clippy::disallowed_macros)]
 
-    use nonempty::NonEmpty;
+    use spacetimedb_primitives::ColId;
     use std::sync::{Arc, Mutex};
 
     use crate::address::Address;
@@ -734,7 +733,7 @@ mod tests {
         let table_id = stdb.table_id_from_name(&tx, "MyTable")?.unwrap();
         let schema = stdb.schema_for_table(&tx, table_id)?;
         let col = schema.columns.iter().find(|x| x.col_name == "my_col").unwrap();
-        assert_eq!(col.col_id, 0);
+        assert_eq!(col.col_id, ColId(0));
         Ok(())
     }
 
@@ -816,7 +815,7 @@ mod tests {
         stdb.insert(&mut tx, table_id, product![AlgebraicValue::I32(1)])?;
 
         let mut rows = stdb
-            .iter_by_col_range(&tx, table_id, 0, AlgebraicValue::I32(0)..)?
+            .iter_by_col_range(&tx, table_id, ColId(0), AlgebraicValue::I32(0)..)?
             .map(|r| *r.view().elements[0].as_i32().unwrap())
             .collect::<Vec<i32>>();
         rows.sort();
@@ -842,7 +841,7 @@ mod tests {
 
         let tx = stdb.begin_tx();
         let mut rows = stdb
-            .iter_by_col_range(&tx, table_id, 0, AlgebraicValue::I32(0)..)?
+            .iter_by_col_range(&tx, table_id, ColId(0), AlgebraicValue::I32(0)..)?
             .map(|r| *r.view().elements[0].as_i32().unwrap())
             .collect::<Vec<i32>>();
         rows.sort();
@@ -922,7 +921,7 @@ mod tests {
         stdb.insert(&mut tx, table_id, product![AlgebraicValue::I64(0)])?;
 
         let mut rows = stdb
-            .iter_by_col_range(&tx, table_id, 0, AlgebraicValue::I64(0)..)?
+            .iter_by_col_range(&tx, table_id, ColId(0), AlgebraicValue::I64(0)..)?
             .map(|r| *r.view().elements[0].as_i64().unwrap())
             .collect::<Vec<i64>>();
         rows.sort();
@@ -957,7 +956,7 @@ mod tests {
         stdb.insert(&mut tx, table_id, product![AlgebraicValue::I64(6)])?;
 
         let mut rows = stdb
-            .iter_by_col_range(&tx, table_id, 0, AlgebraicValue::I64(0)..)?
+            .iter_by_col_range(&tx, table_id, ColId(0), AlgebraicValue::I64(0)..)?
             .map(|r| *r.view().elements[0].as_i64().unwrap())
             .collect::<Vec<i64>>();
         rows.sort();
@@ -991,7 +990,7 @@ mod tests {
         stdb.insert(&mut tx, table_id, product![AlgebraicValue::I64(0)])?;
 
         let mut rows = stdb
-            .iter_by_col_range(&tx, table_id, 0, AlgebraicValue::I64(0)..)?
+            .iter_by_col_range(&tx, table_id, ColId(0), AlgebraicValue::I64(0)..)?
             .map(|r| *r.view().elements[0].as_i64().unwrap())
             .collect::<Vec<i64>>();
         rows.sort();
@@ -1009,7 +1008,7 @@ mod tests {
         stdb.insert(&mut tx, table_id, product![AlgebraicValue::I64(0)])?;
 
         let mut rows = stdb
-            .iter_by_col_range(&tx, table_id, 0, AlgebraicValue::I64(0)..)?
+            .iter_by_col_range(&tx, table_id, ColId(0), AlgebraicValue::I64(0)..)?
             .map(|r| *r.view().elements[0].as_i64().unwrap())
             .collect::<Vec<i64>>();
         rows.sort();
@@ -1031,12 +1030,7 @@ mod tests {
                 col_type: AlgebraicType::I64,
                 is_autoinc: false,
             }],
-            indexes: vec![IndexDef {
-                table_id: 0,
-                cols: NonEmpty::new(0),
-                name: "MyTable_my_col_idx".to_string(),
-                is_unique: false,
-            }],
+            indexes: vec![IndexDef::new("MyTable_my_col_idx".to_string(), 0, ColId(0), false)],
             table_type: StTableType::User,
             table_access: StAccess::Public,
         };
@@ -1051,7 +1045,7 @@ mod tests {
         stdb.insert(&mut tx, table_id, product![AlgebraicValue::I64(1)])?;
 
         let mut rows = stdb
-            .iter_by_col_range(&tx, table_id, 0, AlgebraicValue::I64(0)..)?
+            .iter_by_col_range(&tx, table_id, ColId(0), AlgebraicValue::I64(0)..)?
             .map(|r| *r.view().elements[0].as_i64().unwrap())
             .collect::<Vec<i64>>();
         rows.sort();
@@ -1073,12 +1067,7 @@ mod tests {
                 col_type: AlgebraicType::I64,
                 is_autoinc: false,
             }],
-            indexes: vec![IndexDef {
-                table_id: 0,
-                cols: NonEmpty::new(0),
-                name: "MyTable_my_col_idx".to_string(),
-                is_unique: true,
-            }],
+            indexes: vec![IndexDef::new("MyTable_my_col_idx".to_string(), 0, ColId(0), true)],
             table_type: StTableType::User,
             table_access: StAccess::Public,
         };
@@ -1120,12 +1109,7 @@ mod tests {
                 col_type: AlgebraicType::I64,
                 is_autoinc: true,
             }],
-            indexes: vec![IndexDef {
-                table_id: 0,
-                cols: NonEmpty::new(0),
-                name: "MyTable_my_col_idx".to_string(),
-                is_unique: true,
-            }],
+            indexes: vec![IndexDef::new("MyTable_my_col_idx".to_string(), 0, ColId(0), true)],
             table_type: StTableType::User,
             table_access: StAccess::Public,
         };
@@ -1143,7 +1127,7 @@ mod tests {
         stdb.insert(&mut tx, table_id, product![AlgebraicValue::I64(0)])?;
 
         let mut rows = stdb
-            .iter_by_col_range(&tx, table_id, 0, AlgebraicValue::I64(0)..)?
+            .iter_by_col_range(&tx, table_id, ColId(0), AlgebraicValue::I64(0)..)?
             .map(|r| *r.view().elements[0].as_i64().unwrap())
             .collect::<Vec<i64>>();
         rows.sort();
@@ -1183,24 +1167,9 @@ mod tests {
                 },
             ],
             indexes: vec![
-                IndexDef {
-                    table_id: 0,
-                    cols: NonEmpty::new(0),
-                    name: "MyTable_col1_idx".to_string(),
-                    is_unique: true,
-                },
-                IndexDef {
-                    table_id: 0,
-                    cols: NonEmpty::new(2),
-                    name: "MyTable_col3_idx".to_string(),
-                    is_unique: false,
-                },
-                IndexDef {
-                    table_id: 0,
-                    cols: NonEmpty::new(3),
-                    name: "MyTable_col4_idx".to_string(),
-                    is_unique: true,
-                },
+                IndexDef::new("MyTable_col1_idx".to_string(), 0, ColId(0), true),
+                IndexDef::new("MyTable_col3_idx".to_string(), 0, ColId(2), false),
+                IndexDef::new("MyTable_col4_idx".to_string(), 0, ColId(3), true),
             ],
             table_type: StTableType::User,
             table_access: StAccess::Public,
@@ -1253,12 +1222,7 @@ mod tests {
                 col_type: AlgebraicType::I64,
                 is_autoinc: true,
             }],
-            indexes: vec![IndexDef {
-                table_id: 0,
-                cols: NonEmpty::new(0),
-                name: "MyTable_my_col_idx".to_string(),
-                is_unique: true,
-            }],
+            indexes: vec![IndexDef::new("MyTable_my_col_idx".to_string(), 0, ColId(0), true)],
             table_type: StTableType::User,
             table_access: StAccess::Public,
         };

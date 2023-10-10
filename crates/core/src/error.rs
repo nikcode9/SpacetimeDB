@@ -1,10 +1,11 @@
 use crate::client::ClientActorId;
-use crate::db::datastore::traits::{IndexDef, IndexId, TableId};
+use crate::db::datastore::traits::IndexDef;
 use hex::FromHexError;
 use spacetimedb_lib::buffer::DecodeError;
 use spacetimedb_lib::error::{LibError, RelationError};
 use spacetimedb_lib::relation::FieldName;
 use spacetimedb_lib::{PrimaryKey, ProductValue};
+use spacetimedb_primitives::{IndexId, TableId};
 use spacetimedb_sats::product_value::InvalidFieldError;
 use spacetimedb_sats::satn::Satn;
 use spacetimedb_sats::AlgebraicValue;

@@ -1,5 +1,6 @@
 use spacetimedb::db::datastore::traits::TableSchema;
 use spacetimedb_lib::AlgebraicValue;
+use spacetimedb_primitives::ColId;
 
 use crate::schemas::{BenchTable, IndexStrategy};
 use crate::ResultBench;
@@ -46,7 +47,7 @@ pub trait BenchDatabase: Sized {
     fn filter<T: BenchTable>(
         &mut self,
         table: &TableSchema,
-        column_index: u32,
+        column_index: ColId,
         value: AlgebraicValue,
     ) -> ResultBench<()>;
 
@@ -59,7 +60,7 @@ pub trait BenchDatabase: Sized {
     fn sql_where<T: BenchTable>(
         &mut self,
         table: &TableSchema,
-        column_index: u32,
+        column_index: ColId,
         value: AlgebraicValue,
     ) -> ResultBench<()>;
 }

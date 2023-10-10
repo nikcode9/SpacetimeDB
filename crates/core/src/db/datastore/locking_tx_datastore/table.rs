@@ -2,8 +2,9 @@ use super::{
     btree_index::{BTreeIndex, BTreeIndexRangeIter},
     RowId,
 };
-use crate::db::datastore::traits::{ColId, TableSchema};
+use crate::db::datastore::traits::TableSchema;
 use nonempty::NonEmpty;
+use spacetimedb_primitives::ColId;
 use spacetimedb_sats::{AlgebraicValue, ProductType, ProductValue};
 use std::{
     collections::{BTreeMap, HashMap},
@@ -20,7 +21,7 @@ pub(crate) struct Table {
 impl Table {
     pub(crate) fn insert_index(&mut self, mut index: BTreeIndex) {
         index.build_from_rows(self.scan_rows()).unwrap();
-        self.indexes.insert(index.cols.clone().map(ColId), index);
+        self.indexes.insert(index.cols.clone(), index);
     }
 
     pub(crate) fn insert(&mut self, row_id: RowId, row: ProductValue) {
@@ -33,7 +34,7 @@ impl Table {
     pub(crate) fn delete(&mut self, row_id: &RowId) -> Option<ProductValue> {
         let row = self.rows.remove(row_id)?;
         for (cols, index) in self.indexes.iter_mut() {
-            let col_value = row.project_not_empty(&cols.clone().map(|x| x.0)).unwrap();
+            let col_value = row.project_not_empty(cols).unwrap();
             index.delete(&col_value, row_id)
         }
         Some(row)

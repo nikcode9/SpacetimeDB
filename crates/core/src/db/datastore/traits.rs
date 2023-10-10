@@ -1,9 +1,9 @@
 use crate::db::relational_db::ST_TABLES_ID;
-use core::fmt;
 use nonempty::NonEmpty;
 use spacetimedb_lib::auth::{StAccess, StTableType};
 use spacetimedb_lib::relation::{DbTable, FieldName, FieldOnly, Header, TableField};
 use spacetimedb_lib::{ColumnIndexAttribute, DataKey, Hash};
+use spacetimedb_primitives::{ColId, IndexId, SequenceId, TableId};
 use spacetimedb_sats::product_value::InvalidFieldError;
 use spacetimedb_sats::{AlgebraicType, AlgebraicValue, ProductType, ProductTypeElement, ProductValue};
 use spacetimedb_vm::expr::SourceExpr;
@@ -11,52 +11,12 @@ use std::{ops::RangeBounds, sync::Arc};
 
 use super::{system_tables::StTableRow, Result};
 
-/// The `id` for [Sequence]
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
-pub struct TableId(pub(crate) u32);
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
-pub struct ColId(pub(crate) u32);
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
-pub struct IndexId(pub(crate) u32);
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct SequenceId(pub(crate) u32);
-
-impl From<IndexId> for AlgebraicValue {
-    fn from(value: IndexId) -> Self {
-        value.0.into()
-    }
-}
-
-impl From<SequenceId> for AlgebraicValue {
-    fn from(value: SequenceId) -> Self {
-        value.0.into()
-    }
-}
-
-impl fmt::Display for SequenceId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl TableId {
-    pub fn from_u32_for_testing(id: u32) -> Self {
-        Self(id)
-    }
-}
-
-impl From<TableId> for AlgebraicValue {
-    fn from(value: TableId) -> Self {
-        value.0.into()
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SequenceSchema {
     pub(crate) sequence_id: u32,
     pub(crate) sequence_name: String,
     pub(crate) table_id: u32,
-    pub(crate) col_id: u32,
+    pub(crate) col_id: ColId,
     pub(crate) increment: i128,
     pub(crate) start: i128,
     pub(crate) min_value: i128,
@@ -70,7 +30,7 @@ pub struct SequenceSchema {
 pub struct SequenceDef {
     pub(crate) sequence_name: String,
     pub(crate) table_id: u32,
-    pub(crate) col_id: u32,
+    pub(crate) col_id: ColId,
     pub(crate) increment: i128,
     pub(crate) start: Option<i128>,
     pub(crate) min_value: Option<i128>,
@@ -83,20 +43,20 @@ pub struct IndexSchema {
     pub(crate) table_id: u32,
     pub(crate) index_name: String,
     pub(crate) is_unique: bool,
-    pub(crate) cols: NonEmpty<u32>,
+    pub(crate) cols: NonEmpty<ColId>,
 }
 
 /// This type is just the [IndexSchema] without the autoinc fields
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IndexDef {
     pub(crate) table_id: u32,
-    pub(crate) cols: NonEmpty<u32>,
+    pub(crate) cols: NonEmpty<ColId>,
     pub(crate) name: String,
     pub(crate) is_unique: bool,
 }
 
 impl IndexDef {
-    pub fn new(name: String, table_id: u32, col_id: u32, is_unique: bool) -> Self {
+    pub fn new(name: String, table_id: u32, col_id: ColId, is_unique: bool) -> Self {
         Self {
             cols: NonEmpty::new(col_id),
             name,
@@ -120,7 +80,7 @@ impl From<IndexSchema> for IndexDef {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ColumnSchema {
     pub table_id: u32,
-    pub col_id: u32,
+    pub col_id: ColId,
     pub col_name: String,
     pub col_type: AlgebraicType,
     pub is_autoinc: bool,
@@ -146,7 +106,7 @@ impl From<&ColumnSchema> for spacetimedb_lib::table::ColumnDef {
             // } else {
             //     spacetimedb_lib::ColumnIndexAttribute::UnSet
             // },
-            pos: value.col_id as usize,
+            pos: value.col_id.idx(),
         }
     }
 }
@@ -264,8 +224,8 @@ impl TableSchema {
 
     /// Utility for project the fields from the supplied `columns` that is a [NonEmpty<u32>],
     /// used for when the list of field columns have at least one value.
-    pub fn project_not_empty(&self, columns: &NonEmpty<u32>) -> Result<Vec<&ColumnSchema>> {
-        self.project(columns.iter().map(|&x| x as usize))
+    pub fn project_not_empty(&self, columns: &NonEmpty<ColId>) -> Result<Vec<&ColumnSchema>> {
+        self.project(columns.iter().map(|&x| x.idx()))
     }
 }
 

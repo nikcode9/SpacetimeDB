@@ -10,6 +10,7 @@ use spacetimedb_bench::{
     spacetime_module, spacetime_raw, sqlite, ResultBench,
 };
 use spacetimedb_lib::sats::AlgebraicType;
+use spacetimedb_primitives::ColId;
 fn criterion_benchmark(c: &mut Criterion) {
     bench_suite::<sqlite::SQLite>(c, true).unwrap();
     bench_suite::<spacetime_raw::SpacetimeRaw>(c, true).unwrap();
@@ -289,11 +290,11 @@ fn _filter_setup<DB: BenchDatabase, T: BenchTable + RandomTable>(
     bench_name: &str,
     table_id: &DB::TableId,
     index_strategy: &IndexStrategy,
-    column_index: u32,
+    column_index: ColId,
     load: u32,
     buckets: u32,
 ) -> ResultBench<(String, TableSchema, Vec<T>)> {
-    let filter_column_type = match T::product_type().elements[column_index as usize].algebraic_type {
+    let filter_column_type = match T::product_type().elements[column_index.idx()].algebraic_type {
         AlgebraicType::String => "string",
         AlgebraicType::U32 => "u32",
         AlgebraicType::U64 => "u64",
@@ -325,7 +326,7 @@ fn filter<DB: BenchDatabase, T: BenchTable + RandomTable>(
     db: &mut DB,
     table_id: &DB::TableId,
     index_strategy: &IndexStrategy,
-    column_index: u32,
+    column_index: ColId,
     load: u32,
     buckets: u32,
 ) -> ResultBench<()> {
@@ -363,7 +364,7 @@ fn sql_where<DB: BenchDatabase, T: BenchTable + RandomTable>(
     db: &mut DB,
     table_id: &DB::TableId,
     index_strategy: &IndexStrategy,
-    column_index: u32,
+    column_index: ColId,
     load: u32,
     buckets: u32,
 ) -> ResultBench<()> {
@@ -389,7 +390,7 @@ fn sql_where<DB: BenchDatabase, T: BenchTable + RandomTable>(
             db,
             |_| {
                 // pick something to look for
-                let value = data[i].clone().into_product_value().elements[column_index as usize].clone();
+                let value = data[i].clone().into_product_value().elements[column_index.idx()].clone();
                 i = (i + 1) % load as usize;
                 Ok(value)
             },
@@ -439,7 +440,7 @@ fn find<DB: BenchDatabase, T: BenchTable + RandomTable>(
     db: &mut DB,
     table_id: &DB::TableId,
     index_strategy: &IndexStrategy,
-    column_id: u32,
+    column_id: ColId,
     load: u32,
     buckets: u32,
 ) -> ResultBench<()> {
@@ -455,7 +456,7 @@ fn find<DB: BenchDatabase, T: BenchTable + RandomTable>(
             b,
             db,
             |_| {
-                let value = data[i].clone().into_product_value().elements[column_id as usize].clone();
+                let value = data[i].clone().into_product_value().elements[column_id.idx()].clone();
                 i = (i + 1) % load as usize;
                 Ok(value)
             },
@@ -476,7 +477,7 @@ fn sql_find<DB: BenchDatabase, T: BenchTable + RandomTable>(
     db: &mut DB,
     table_id: &DB::TableId,
     index_strategy: &IndexStrategy,
-    column_id: u32,
+    column_id: ColId,
     load: u32,
     buckets: u32,
 ) -> ResultBench<()> {
@@ -493,7 +494,7 @@ fn sql_find<DB: BenchDatabase, T: BenchTable + RandomTable>(
             b,
             db,
             |_| {
-                let value = data[i].clone().into_product_value().elements[column_id as usize].clone();
+                let value = data[i].clone().into_product_value().elements[column_id.idx()].clone();
                 i = (i + 1) % load as usize;
                 Ok(value)
             },

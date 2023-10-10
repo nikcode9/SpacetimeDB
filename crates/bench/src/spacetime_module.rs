@@ -2,6 +2,7 @@ use spacetimedb::db::datastore::traits::TableSchema;
 use spacetimedb::db::{Config, FsyncPolicy, Storage};
 use spacetimedb_lib::sats::product;
 use spacetimedb_lib::{sats::ArrayValue, AlgebraicValue, ProductValue};
+use spacetimedb_primitives::ColId;
 use spacetimedb_testing::modules::{start_runtime, CompilationMode, CompiledModule, ModuleHandle};
 use tokio::runtime::Runtime;
 
@@ -178,14 +179,14 @@ impl BenchDatabase for SpacetimeModule {
     fn filter<T: BenchTable>(
         &mut self,
         table: &TableSchema,
-        column_index: u32,
+        column_index: ColId,
         value: AlgebraicValue,
     ) -> ResultBench<()> {
         let SpacetimeModule { runtime, module } = self;
         let module = module.as_mut().unwrap();
 
         //let product_type = T::product_type();
-        let column_name = &table.columns[column_index as usize].col_name;
+        let column_name = &table.columns[column_index.idx()].col_name;
         let reducer_name = format!("filter_{}_by_{}", table.table_name, column_name);
 
         runtime.block_on(async move {
@@ -210,10 +211,10 @@ impl BenchDatabase for SpacetimeModule {
     fn sql_where<T: BenchTable>(
         &mut self,
         table: &TableSchema,
-        column_index: u32,
+        column_index: ColId,
         value: AlgebraicValue,
     ) -> ResultBench<()> {
-        let column = &table.columns[column_index as usize].col_name;
+        let column = &table.columns[column_index.idx()].col_name;
 
         let value = match value {
             AlgebraicValue::U32(x) => x.to_string(),

@@ -13,12 +13,13 @@ use sqlparser::parser::Parser;
 use std::collections::HashMap;
 
 use crate::db::datastore::locking_tx_datastore::MutTxId;
-use crate::db::datastore::traits::{MutTxDatastore, TableId, TableSchema};
+use crate::db::datastore::traits::{MutTxDatastore, TableSchema};
 use crate::db::relational_db::RelationalDB;
 use crate::error::{DBError, PlanError};
 use spacetimedb_lib::relation::{extract_table_field, FieldExpr, FieldName};
 use spacetimedb_vm::errors::ErrorVm;
 use spacetimedb_vm::expr::{ColumnOp, DbType, Expr};
+use spacetimedb_primitives::TableId;
 use spacetimedb_vm::operator::{OpCmp, OpLogic, OpQuery};
 use spacetimedb_vm::ops::parse::parse;
 

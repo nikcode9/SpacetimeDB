@@ -6,6 +6,7 @@ use spacetimedb_lib::relation::{
 };
 use spacetimedb_lib::table::ProductTypeMeta;
 use spacetimedb_lib::Identity;
+use spacetimedb_primitives::ColId;
 use spacetimedb_sats::algebraic_type::AlgebraicType;
 use spacetimedb_sats::algebraic_value::AlgebraicValue;
 use spacetimedb_sats::satn::Satn;
@@ -228,7 +229,7 @@ impl From<IndexScan> for ColumnOp {
     fn from(value: IndexScan) -> Self {
         let table = value.table;
         let col_id = value.col_id;
-        let field = table.head.fields[col_id as usize].field.clone();
+        let field = table.head.fields[col_id.idx()].field.clone();
         match (value.lower_bound, value.upper_bound) {
             // Inclusive lower bound => field >= value
             (Bound::Included(value), Bound::Unbounded) => ColumnOp::Cmp {
@@ -356,7 +357,7 @@ pub struct IndexJoin {
     pub probe_field: FieldName,
     pub index_header: Header,
     pub index_table: u32,
-    pub index_col: u32,
+    pub index_col: ColId,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord)]
@@ -368,7 +369,7 @@ pub struct JoinExpr {
 
 impl From<IndexJoin> for JoinExpr {
     fn from(value: IndexJoin) -> Self {
-        let pos = value.index_col as usize;
+        let pos = value.index_col.idx();
         let rhs = value.probe_side;
         let col_lhs = value.index_header.fields[pos].field.clone();
         let col_rhs = value.probe_field;
@@ -447,7 +448,7 @@ pub enum CrudExpr {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct IndexScan {
     pub table: DbTable,
-    pub col_id: u32,
+    pub col_id: ColId,
     pub lower_bound: Bound<AlgebraicValue>,
     pub upper_bound: Bound<AlgebraicValue>,
 }
@@ -566,7 +567,7 @@ impl QueryExpr {
     // Generate an index scan for an equality predicate if this is the first operator.
     // Otherwise generate a select.
     // TODO: Replace these methods with a proper query optimization pass.
-    pub fn with_index_eq(mut self, table: DbTable, col_id: u32, value: AlgebraicValue) -> Self {
+    pub fn with_index_eq(mut self, table: DbTable, col_id: ColId, value: AlgebraicValue) -> Self {
         // if this is the first operator in the list, generate index scan
         let Some(query) = self.query.pop() else {
             self.query.push(Query::IndexScan(IndexScan {
@@ -641,7 +642,7 @@ impl QueryExpr {
     pub fn with_index_lower_bound(
         mut self,
         table: DbTable,
-        col_id: u32,
+        col_id: ColId,
         value: AlgebraicValue,
         inclusive: bool,
     ) -> Self {
@@ -749,7 +750,7 @@ impl QueryExpr {
     pub fn with_index_upper_bound(
         mut self,
         table: DbTable,
-        col_id: u32,
+        col_id: ColId,
         value: AlgebraicValue,
         inclusive: bool,
     ) -> Self {

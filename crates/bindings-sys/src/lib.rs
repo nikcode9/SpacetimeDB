@@ -13,6 +13,8 @@ use std::ptr;
 
 use alloc::boxed::Box;
 
+use spacetimedb_primitives::ColId;
+
 /// The current version of the ABI.
 ///
 /// Exported as `SPACETIME_ABI_VERSION`, a `u32` WASM global.
@@ -39,6 +41,7 @@ pub const ABI_VERSION: u32 = 0x0005_0000;
 /// Provides a raw set of sys calls which abstractions can be built atop of.
 pub mod raw {
     use core::mem::ManuallyDrop;
+    use spacetimedb_primitives::ColId;
 
     #[link(wasm_import_module = "spacetime")]
     extern "C" {
@@ -111,7 +114,7 @@ pub mod raw {
         /// - `(val, val_len)` cannot be decoded to an `AlgebraicValue`
         ///   typed at the `AlgebraicType` of the column,
         /// - `val + val_len` overflows a 64-bit integer
-        pub fn _iter_by_col_eq(table_id: u32, col_id: u32, val: *const u8, val_len: usize, out: *mut Buffer) -> u16;
+        pub fn _iter_by_col_eq(table_id: u32, col_id: ColId, val: *const u8, val_len: usize, out: *mut Buffer) -> u16;
 
         /// Inserts a row into the table identified by `table_id`,
         /// where the row is read from the byte slice `row` in WASM memory,
@@ -147,7 +150,7 @@ pub mod raw {
         ///   according to the `AlgebraicType` that the table's schema specifies for `col_id`.
         /// - `value + value_len` overflows a 64-bit integer
         /// - writing to `out` would overflow a 32-bit integer
-        pub fn _delete_by_col_eq(table_id: u32, col_id: u32, value: *const u8, value_len: usize, out: *mut u32) -> u16;
+        pub fn _delete_by_col_eq(table_id: u32, col_id: ColId, value: *const u8, value_len: usize, out: *mut u32) -> u16;
 
         /*
         /// Deletes the primary key pointed to at by `pk` in the table identified by `table_id`.
@@ -563,7 +566,7 @@ pub fn create_index(index_name: &str, table_id: u32, index_type: u8, col_ids: &[
 /// - `val` cannot be BSATN-decoded to an `AlgebraicValue`
 ///   typed at the `AlgebraicType` of the column
 #[inline]
-pub fn iter_by_col_eq(table_id: u32, col_id: u32, val: &[u8]) -> Result<Buffer, Errno> {
+pub fn iter_by_col_eq(table_id: u32, col_id: ColId, val: &[u8]) -> Result<Buffer, Errno> {
     unsafe { call(|out| raw::_iter_by_col_eq(table_id, col_id, val.as_ptr(), val.len(), out)) }
 }
 
@@ -597,7 +600,7 @@ pub fn insert(table_id: u32, row: &mut [u8]) -> Result<(), Errno> {
 /// - no columns were deleted
 /// - `col_id` does not identify a column of the table
 #[inline]
-pub fn delete_by_col_eq(table_id: u32, col_id: u32, value: &[u8]) -> Result<u32, Errno> {
+pub fn delete_by_col_eq(table_id: u32, col_id: ColId, value: &[u8]) -> Result<u32, Errno> {
     unsafe { call(|out| raw::_delete_by_col_eq(table_id, col_id, value.as_ptr(), value.len(), out)) }
 }
 
