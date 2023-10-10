@@ -83,7 +83,13 @@ pub(crate) struct BTreeIndex {
 }
 
 impl BTreeIndex {
-    pub(crate) fn new(index_id: IndexId, table_id: TableId, cols: NonEmpty<ColId>, name: String, is_unique: bool) -> Self {
+    pub(crate) fn new(
+        index_id: IndexId,
+        table_id: TableId,
+        cols: NonEmpty<ColId>,
+        name: String,
+        is_unique: bool,
+    ) -> Self {
         Self {
             index_id,
             table_id,

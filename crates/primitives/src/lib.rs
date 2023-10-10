@@ -2,4 +2,4 @@
 
 mod ids;
 
-pub use ids::{ColId, SequenceId, TableId, IndexId};
+pub use ids::{ColId, IndexId, SequenceId, TableId};

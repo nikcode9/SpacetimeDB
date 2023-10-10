@@ -1,5 +1,5 @@
 use crate::{AlgebraicType, AlgebraicValue, ArrayType, BuiltinType, MapType, ProductType, ProductValue};
-use spacetimedb_primitives::{TableId, ColId, IndexId, SequenceId};
+use spacetimedb_primitives::{ColId, IndexId, SequenceId, TableId};
 
 impl crate::Value for AlgebraicValue {
     type Type = AlgebraicType;

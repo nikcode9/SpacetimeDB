@@ -8,9 +8,9 @@ use crate::auth::{StAccess, StTableType};
 use crate::error::RelationError;
 use crate::table::ColumnDef;
 use crate::DataKey;
+use spacetimedb_primitives::TableId;
 use spacetimedb_sats::algebraic_value::AlgebraicValue;
 use spacetimedb_sats::product_value::ProductValue;
-use spacetimedb_primitives::TableId;
 use spacetimedb_sats::satn::Satn;
 use spacetimedb_sats::{algebraic_type, AlgebraicType, ProductType, ProductTypeElement, Typespace, WithTypespace};
 

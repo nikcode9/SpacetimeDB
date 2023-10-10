@@ -518,7 +518,7 @@ pub(crate) mod tests {
     use nonempty::NonEmpty;
     use spacetimedb_lib::error::ResultTest;
     use spacetimedb_lib::relation::{DbTable, FieldName};
-    use spacetimedb_primitives::{TableId, SequenceId};
+    use spacetimedb_primitives::{SequenceId, TableId};
     use spacetimedb_sats::{product, AlgebraicType, ProductType, ProductValue};
     use spacetimedb_vm::dsl::*;
     use spacetimedb_vm::eval::run_ast;

@@ -2162,7 +2162,7 @@ mod tests {
         error::ResultTest,
         ColumnIndexAttribute,
     };
-    use spacetimedb_primitives::{IndexId, TableId, SequenceId};
+    use spacetimedb_primitives::{IndexId, SequenceId, TableId};
     use spacetimedb_sats::{product, AlgebraicType, AlgebraicValue, ProductValue};
 
     fn u32_str_u32(a: u32, b: &str, c: u32) -> ProductValue {

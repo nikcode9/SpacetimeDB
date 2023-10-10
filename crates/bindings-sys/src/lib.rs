@@ -114,7 +114,13 @@ pub mod raw {
         /// - `(val, val_len)` cannot be decoded to an `AlgebraicValue`
         ///   typed at the `AlgebraicType` of the column,
         /// - `val + val_len` overflows a 64-bit integer
-        pub fn _iter_by_col_eq(table_id: TableId, col_id: ColId, val: *const u8, val_len: usize, out: *mut Buffer) -> u16;
+        pub fn _iter_by_col_eq(
+            table_id: TableId,
+            col_id: ColId,
+            val: *const u8,
+            val_len: usize,
+            out: *mut Buffer,
+        ) -> u16;
 
         /// Inserts a row into the table identified by `table_id`,
         /// where the row is read from the byte slice `row` in WASM memory,
@@ -150,7 +156,13 @@ pub mod raw {
         ///   according to the `AlgebraicType` that the table's schema specifies for `col_id`.
         /// - `value + value_len` overflows a 64-bit integer
         /// - writing to `out` would overflow a 32-bit integer
-        pub fn _delete_by_col_eq(table_id: TableId, col_id: ColId, value: *const u8, value_len: usize, out: *mut u32) -> u16;
+        pub fn _delete_by_col_eq(
+            table_id: TableId,
+            col_id: ColId,
+            value: *const u8,
+            value_len: usize,
+            out: *mut u32,
+        ) -> u16;
 
         /*
         /// Deletes the primary key pointed to at by `pk` in the table identified by `table_id`.
@@ -189,7 +201,12 @@ pub mod raw {
         /// - a table with the provided `table_id` doesn't exist
         /// - `(filter, filter_len)` doesn't decode to a filter expression
         /// - `filter + filter_len` overflows a 64-bit integer
-        pub fn _iter_start_filtered(table_id: TableId, filter: *const u8, filter_len: usize, out: *mut BufferIter) -> u16;
+        pub fn _iter_start_filtered(
+            table_id: TableId,
+            filter: *const u8,
+            filter_len: usize,
+            out: *mut BufferIter,
+        ) -> u16;
 
         /// Advances the registered iterator with the index given by `iter_key`.
         ///

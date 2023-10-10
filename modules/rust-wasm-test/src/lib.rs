@@ -1,6 +1,7 @@
 #![allow(clippy::disallowed_names)]
 use spacetimedb::{
-    delete_by_col_eq, query, spacetimedb, AlgebraicValue, Deserialize, ReducerContext, SpacetimeType, Timestamp, TableId,
+    delete_by_col_eq, query, spacetimedb, AlgebraicValue, Deserialize, ReducerContext, SpacetimeType, TableId,
+    Timestamp,
 };
 use spacetimedb_lib::bsatn;
 
