@@ -3,7 +3,7 @@ use super::Mem;
 use crate::host::instance_env::InstanceEnv;
 use crate::host::wasm_common::module_host_actor::{DescribeError, InitializationError};
 use crate::host::wasm_common::*;
-use crate::host::{EnergyQuanta, Timestamp};
+use crate::host::{EnergyQuanta, ReducerId, Timestamp};
 use bytes::Bytes;
 use spacetimedb_lib::{Address, Identity};
 use wasmer::{
@@ -217,7 +217,17 @@ impl module_host_actor::WasmInstancePre for WasmerModule {
             }
         }
 
-        Ok(WasmerInstance { store, env, instance })
+        let call_reducer = instance
+            .exports
+            .get_typed_function(&store, CALL_REDUCER_DUNDER)
+            .expect("no call_reducer");
+
+        Ok(WasmerInstance {
+            store,
+            env,
+            instance,
+            call_reducer,
+        })
     }
 }
 
@@ -225,10 +235,14 @@ pub struct WasmerInstance {
     store: Store,
     env: FunctionEnv<WasmInstanceEnv>,
     instance: Instance,
+    call_reducer: TypedFunction<(u32, u32, u32, u64, u32), u32>,
 }
 
-impl WasmerInstance {
-    fn call_describer(&mut self, describer: &Function, describer_func_name: &str) -> Result<Bytes, DescribeError> {
+impl module_host_actor::WasmInstance for WasmerInstance {
+    fn extract_descriptions(&mut self) -> Result<Bytes, DescribeError> {
+        let describer_func_name = DESCRIBE_MODULE_DUNDER;
+        let describer = self.instance.exports.get_function(describer_func_name).unwrap();
+
         let start = std::time::Instant::now();
         log::trace!("Start describer \"{}\"...", describer_func_name);
 
@@ -252,14 +266,6 @@ impl WasmerInstance {
         self.env.as_mut(store).buffers.clear();
         Ok(bytes)
     }
-}
-
-impl module_host_actor::WasmInstance for WasmerInstance {
-    fn extract_descriptions(&mut self) -> Result<Bytes, DescribeError> {
-        let describer = self.instance.exports.get_function(DESCRIBE_MODULE_DUNDER).unwrap();
-        let describer = describer.clone();
-        self.call_describer(&describer, DESCRIBE_MODULE_DUNDER)
-    }
 
     fn instance_env(&self) -> &InstanceEnv {
         &self.env.as_ref(&self.store).instance_env
@@ -269,83 +275,56 @@ impl module_host_actor::WasmInstance for WasmerInstance {
 
     fn call_reducer(
         &mut self,
-        reducer_id: usize,
+        reducer_id: ReducerId,
         budget: EnergyQuanta,
-        sender_identity: &Identity,
-        sender_address: &Address,
+        caller_identity: &Identity,
+        caller_address: &Address,
         timestamp: Timestamp,
         arg_bytes: Bytes,
     ) -> module_host_actor::ExecuteResult<Self::Trap> {
-        self.call_tx_function::<(u32, u32, u32, u64, u32), 3>(
-            CALL_REDUCER_DUNDER,
-            budget,
-            [
-                Bytes::copy_from_slice(sender_identity.as_bytes()),
-                Bytes::copy_from_slice(sender_address.as_slice()),
-                arg_bytes,
-            ],
-            |func, store, [sender_identity, sender_address, args]| {
-                func.call(
-                    store,
-                    reducer_id as u32,
-                    sender_identity.0,
-                    sender_address.0,
-                    timestamp.0,
-                    args.0,
-                )
-            },
-        )
-    }
-
-    fn log_traceback(func_type: &str, func: &str, trap: &Self::Trap) {
-        log_traceback(func_type, func, trap)
-    }
-}
-
-impl WasmerInstance {
-    fn call_tx_function<Args: wasmer::WasmTypeList, const N_BUFS: usize>(
-        &mut self,
-        reducer_symbol: &str,
-        budget: EnergyQuanta,
-        bufs: [Bytes; N_BUFS],
-        // would be nicer if there was a TypedFunction::call_tuple(&self, store, ArgsTuple)
-        call: impl FnOnce(TypedFunction<Args, u32>, &mut Store, [BufferIdx; N_BUFS]) -> Result<u32, RuntimeError>,
-    ) -> module_host_actor::ExecuteResult<RuntimeError> {
         let store = &mut self.store;
         let instance = &self.instance;
         let budget = budget.as_points();
         wasmer_metering::set_remaining_points(store, instance, budget);
 
-        let reduce = instance
-            .exports
-            .get_typed_function::<Args, u32>(store, reducer_symbol)
-            .expect("invalid reducer");
+        let mut make_buf = |data| self.env.as_mut(store).buffers.insert(data);
 
-        let bufs = bufs.map(|data| self.env.as_mut(store).buffers.insert(data));
+        let identity_buf = make_buf(caller_identity.as_bytes().to_vec().into());
+        let address_buf = make_buf(caller_address.as_slice().to_vec().into());
+        let args_buf = make_buf(arg_bytes);
 
         // let guard = pprof::ProfilerGuardBuilder::default().frequency(2500).build().unwrap();
 
         let start = std::time::Instant::now();
-        log::trace!("Start reducer \"{}\"...", reducer_symbol);
-        // pass ownership of the `ptr` allocation into the reducer
-        let result = call(reduce, store, bufs).and_then(|errbuf| {
-            let errbuf = BufferIdx(errbuf);
-            Ok(if errbuf.is_invalid() {
-                Ok(())
-            } else {
-                let errmsg = self
-                    .env
-                    .as_mut(store)
-                    .buffers
-                    .take(errbuf)
-                    .ok_or_else(|| RuntimeError::new("invalid buffer handle"))?;
-                Err(crate::util::string_from_utf8_lossy_owned(errmsg.into()).into())
-            })
-        });
-        self.env.as_mut(store).buffers.clear();
-        // .call(store, sender_buf.ptr.cast(), timestamp, args_buf.ptr, args_buf.len)
-        // .and_then(|_| {});
+        let result = self
+            .call_reducer
+            .call(
+                store,
+                reducer_id.0,
+                identity_buf.0,
+                address_buf.0,
+                timestamp.0,
+                args_buf.0,
+            )
+            .and_then(|errbuf| {
+                let errbuf = BufferIdx(errbuf);
+                Ok(if errbuf.is_invalid() {
+                    Ok(())
+                } else {
+                    let errmsg = self
+                        .env
+                        .as_mut(store)
+                        .buffers
+                        .take(errbuf)
+                        .ok_or_else(|| RuntimeError::new("invalid buffer handle"))?;
+                    Err(crate::util::string_from_utf8_lossy_owned(errmsg.into()).into())
+                })
+            });
+
         let duration = start.elapsed();
+
+        self.env.as_mut(store).buffers.clear();
+
         let remaining = get_remaining_points(store, instance);
         let energy = module_host_actor::EnergyStats {
             used: EnergyQuanta::from_points(budget) - EnergyQuanta::from_points(remaining),
@@ -356,5 +335,9 @@ impl WasmerInstance {
             execution_duration: duration,
             call_result: result,
         }
+    }
+
+    fn log_traceback(func_type: &str, func: &str, trap: &Self::Trap) {
+        log_traceback(func_type, func, trap)
     }
 }

@@ -75,7 +75,7 @@ impl ServerMessage for TransactionUpdateMessage<'_> {
             },
             energy_quanta_used: event.energy_quanta_used.0,
             message: errmsg,
-            caller_address: event.caller_address.unwrap_or(Address::ZERO).to_hex(),
+            caller_address: event.caller_address.unwrap_or(Address::__DUMMY).to_hex(),
         };
 
         let subscription_update = database_update.into_json();
