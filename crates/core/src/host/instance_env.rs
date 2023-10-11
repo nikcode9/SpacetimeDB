@@ -340,11 +340,6 @@ impl InstanceEnv {
             let tx = &mut *tx.get()?;
 
             let mut buf = Vec::new();
-            let schema = stdb.row_schema_for_table(tx, table_id)?;
-            schema.encode(&mut buf);
-            yield_!(buf);
-
-            let mut buf = Vec::new();
             for row in stdb.iter(tx, table_id)? {
                 if should_yield_buf(&buf) {
                     yield_!(buf);
