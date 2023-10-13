@@ -220,7 +220,7 @@ mod tests {
             ops: vec![op],
         };
 
-        let q = QueryExpr::new(db_table((&schema).into(), table_name, table_id));
+        let q = QueryExpr::new(db_table((&schema).into(), table_name.into(), table_id));
 
         Ok((schema, table, data, q))
     }
@@ -358,7 +358,7 @@ mod tests {
         let table_id = create_table_with_rows(&db, &mut tx, "test", schema.clone(), &[])?;
 
         // select * from test
-        let query = QueryExpr::new(db_table(schema.clone(), "test", table_id));
+        let query = QueryExpr::new(db_table(schema.clone(), "test".into(), table_id));
         let query = QuerySet(vec![Query { queries: vec![query] }]);
 
         let op = TableOp {
@@ -554,7 +554,7 @@ mod tests {
         check_query(&db, &table, &mut tx, &q, &data)?;
 
         //SELECT * FROM inventory
-        let q_all = QueryExpr::new(db_table((&schema).into(), "_inventory", schema.table_id));
+        let q_all = QueryExpr::new(db_table((&schema).into(), "_inventory".into(), schema.table_id));
         //SELECT * FROM inventory WHERE inventory_id = 1
         let q_id =
             q_all
@@ -594,7 +594,7 @@ mod tests {
 
         check_query_incr(&db, &mut tx, &s, &update, 3, &[row])?;
 
-        let q = QueryExpr::new(db_table((&schema).into(), "_inventory", schema.table_id));
+        let q = QueryExpr::new(db_table((&schema).into(), "_inventory".into(), schema.table_id));
 
         let q = to_mem_table(q, &data);
         //Try access the private table
@@ -631,7 +631,7 @@ mod tests {
         let (schema, _table, _data, _q) = make_inv(&db, &mut tx, StAccess::Private)?;
 
         //SELECT * FROM inventory
-        let q_all = QueryExpr::new(db_table((&schema).into(), "inventory", schema.table_id));
+        let q_all = QueryExpr::new(db_table((&schema).into(), "inventory".into(), schema.table_id));
         //SELECT * FROM inventory WHERE inventory_id = 1
         let q_id =
             q_all

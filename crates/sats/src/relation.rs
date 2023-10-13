@@ -187,27 +187,23 @@ impl From<Header> for ProductType {
 }
 
 impl Header {
-    pub fn new(table_name: &str, fields: Vec<Column>) -> Self {
-        Self {
-            table_name: table_name.into(),
-            fields,
-        }
+    pub fn new(table_name: String, fields: Vec<Column>) -> Self {
+        Self { table_name, fields }
     }
 
-    pub fn from_product_type(table_name: &str, fields: ProductType) -> Self {
+    pub fn from_product_type(table_name: String, fields: ProductType) -> Self {
         let cols = fields
             .elements
             .into_iter()
             .enumerate()
             .map(|(pos, f)| {
-                let table = table_name.clone();
                 let name = match f.name {
                     None => FieldName::Pos {
-                        table: table.into(),
+                        table: table_name.clone(),
                         field: pos,
                     },
                     Some(field) => FieldName::Name {
-                        table: table.into(),
+                        table: table_name.clone(),
                         field,
                     },
                 };
@@ -220,7 +216,7 @@ impl Header {
 
     pub fn for_mem_table(fields: ProductType) -> Self {
         let table_name = format!("mem#{:x}", calculate_hash(&fields));
-        Self::from_product_type(&table_name, fields)
+        Self::from_product_type(table_name, fields)
     }
 
     pub fn as_without_table_name(&self) -> HeaderOnlyField {
@@ -289,7 +285,7 @@ impl Header {
             }
         }
 
-        Ok(Self::new(&self.table_name, p))
+        Ok(Self::new(self.table_name.clone(), p))
     }
 
     /// Adds the fields from `right` to this [`Header`],
@@ -314,7 +310,7 @@ impl Header {
             fields.push(f);
         }
 
-        Self::new(&self.table_name, fields)
+        Self::new(self.table_name.clone(), fields)
     }
 }
 

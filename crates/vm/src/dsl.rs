@@ -37,7 +37,7 @@ where
 
 pub fn db_table_raw(
     head: ProductType,
-    name: &str,
+    name: String,
     table_id: TableId,
     table_type: StTableType,
     table_access: StAccess,
@@ -47,8 +47,9 @@ pub fn db_table_raw(
 }
 
 /// Create a [DbTable] of type [StTableType::User] and derive `StAccess::for_name(name)`.
-pub fn db_table(head: ProductType, name: &str, table_id: TableId) -> DbTable {
-    db_table_raw(head, name, table_id, StTableType::User, StAccess::for_name(name))
+pub fn db_table(head: ProductType, name: String, table_id: TableId) -> DbTable {
+    let table_access = StAccess::for_name(&name);
+    db_table_raw(head, name, table_id, StTableType::User, table_access)
 }
 
 pub fn bin_op<O, A, B>(op: O, a: A, b: B) -> Expr

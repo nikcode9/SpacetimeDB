@@ -2424,7 +2424,6 @@ impl traits::MutProgrammable for Locking {
 mod tests {
     use super::*;
     use crate::error::IndexError;
-    use itertools::Itertools;
     use spacetimedb_lib::error::ResultTest;
     use spacetimedb_sats::{product, AlgebraicType, AlgebraicValue, ProductValue};
 
