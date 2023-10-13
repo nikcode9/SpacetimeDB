@@ -911,6 +911,8 @@ impl TableSchema {
     pub fn from_def(table_id: TableId, schema: TableDef) -> Self {
         let indexes = schema.generated_indexes().collect::<Vec<_>>();
         let sequences = schema.generated_sequences().collect::<Vec<_>>();
+        //Sort by columns so is likely to get PK first then the rest and maintain the order for
+        //testing.
         TableSchema {
             table_id,
             table_name: schema.table_name.trim().to_string(),
@@ -924,14 +926,12 @@ impl TableSchema {
                 .indexes
                 .into_iter()
                 .chain(indexes)
-                //Sort by columns so is likely to get PK first then the rest...
                 .sorted_by_key(|x| x.columns.clone())
                 .map(|x| IndexSchema::from_def(table_id, x))
                 .collect(),
             constraints: schema
                 .constraints
                 .into_iter()
-                //Sort by columns so is likely to get PK first then the rest...
                 .sorted_by_key(|x| x.columns.clone())
                 .map(|x| ConstraintSchema::from_def(table_id, x))
                 .collect(),
@@ -939,7 +939,6 @@ impl TableSchema {
                 .sequences
                 .into_iter()
                 .chain(sequences)
-                //Sort by columns so is likely to get PK first then the rest...
                 .sorted_by_key(|x| x.col_pos)
                 .map(|x| SequenceSchema::from_def(table_id, x))
                 .collect(),
@@ -1199,13 +1198,15 @@ impl TableDef {
         self.constraints.iter().filter_map(|x| {
             if x.kind.has_index() {
                 let is_unique = x.kind.has_unique();
-
-                Some(IndexDef::for_column(
-                    &self.table_name,
-                    &x.constraint_name,
-                    x.columns.clone(),
-                    is_unique,
-                ))
+                let idx = IndexDef::for_column(&self.table_name, &x.constraint_name, x.columns.clone(), is_unique);
+                if self
+                    .indexes
+                    .binary_search_by(|x| x.index_name.cmp(&idx.index_name))
+                    .is_ok()
+                {
+                    return None;
+                }
+                Some(idx)
             } else {
                 None
             }
@@ -1215,14 +1216,21 @@ impl TableDef {
     /// Get an iterator deriving [SequenceDef] from the constraints that require them like `IDENTITY`.
     pub fn generated_sequences(&self) -> impl Iterator<Item = SequenceDef> + '_ {
         self.constraints.iter().filter_map(|x| {
-            //removes the auto-generated suffix...
-            let name = x
-                .constraint_name
-                .trim_start_matches(&format!("ct_{}_", self.table_name));
-
-            let col_id = x.columns.head;
             if x.kind.has_autoinc() {
-                Some(SequenceDef::for_column(&self.table_name, name, col_id))
+                let col_id = x.columns.head;
+                //removes the auto-generated suffix...
+                let name = x
+                    .constraint_name
+                    .trim_start_matches(&format!("ct_{}_", self.table_name));
+                let seq = SequenceDef::for_column(&self.table_name, name, col_id);
+                if self
+                    .sequences
+                    .binary_search_by(|x| x.sequence_name.cmp(&seq.sequence_name))
+                    .is_ok()
+                {
+                    return None;
+                }
+                Some(seq)
             } else {
                 None
             }

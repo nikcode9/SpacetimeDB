@@ -702,6 +702,9 @@ impl<T: WasmInstance> WasmModuleInstance<T> {
                 let mut other = other.0.clone().into_schema(0.into());
                 me.columns.sort();
                 other.columns.sort();
+                // Remove the indexes, moving indexes is supported.
+                me.indexes.clear();
+                other.indexes.clear();
 
                 me.eq(&other)
             }
