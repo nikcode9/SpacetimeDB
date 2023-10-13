@@ -3,9 +3,10 @@ use crate::{
     schemas::{table_name, BenchTable, IndexStrategy},
     ResultBench,
 };
-use spacetimedb::db::datastore::traits::{ColId, IndexDef, TableDef};
+use nonempty::NonEmpty;
 use spacetimedb::db::relational_db::{open_db, RelationalDB};
 use spacetimedb_lib::sats::AlgebraicValue;
+use spacetimedb_sats::db::def::{ColId, IndexDef, IndexType, TableDef, TableId};
 use std::hint::black_box;
 use tempdir::TempDir;
 
@@ -19,7 +20,7 @@ impl BenchDatabase for SpacetimeRaw {
     fn name() -> &'static str {
         "stdb_raw"
     }
-    type TableId = u32;
+    type TableId = TableId;
 
     fn build(in_memory: bool, fsync: bool) -> ResultBench<Self>
     where
@@ -37,20 +38,29 @@ impl BenchDatabase for SpacetimeRaw {
     fn create_table<T: BenchTable>(&mut self, index_strategy: IndexStrategy) -> ResultBench<Self::TableId> {
         let name = table_name::<T>(index_strategy);
         self.db.with_auto_commit(|tx| {
-            let table_def = TableDef::from(T::product_type());
+            let table_def = TableDef::from_product(&name, T::product_type());
             let table_id = self.db.create_table(tx, table_def)?;
             self.db.rename_table(tx, table_id, &name)?;
             match index_strategy {
                 IndexStrategy::Unique => {
-                    self.db
-                        .create_index(tx, IndexDef::new("id".to_string(), table_id, 0, true))?;
+                    self.db.create_index(
+                        tx,
+                        table_id,
+                        IndexDef::new("id", NonEmpty::new(0.into()), true, IndexType::BTree),
+                    )?;
                 }
                 IndexStrategy::NonUnique => (),
                 IndexStrategy::MultiIndex => {
                     for (i, column) in T::product_type().elements.iter().enumerate() {
                         self.db.create_index(
                             tx,
-                            IndexDef::new(column.name.clone().unwrap(), table_id, i as u32, false),
+                            table_id,
+                            IndexDef::new(
+                                &column.name.clone().unwrap(),
+                                NonEmpty::new(i.into()),
+                                false,
+                                IndexType::BTree,
+                            ),
                         )?;
                     }
                 }
@@ -107,9 +117,8 @@ impl BenchDatabase for SpacetimeRaw {
         column_index: u32,
         value: AlgebraicValue,
     ) -> ResultBench<()> {
-        let col: ColId = column_index.into();
         self.db.with_auto_commit(|tx| {
-            for row in self.db.iter_by_col_eq(tx, *table_id, col, value)? {
+            for row in self.db.iter_by_col_eq(tx, *table_id, ColId(column_index), value)? {
                 black_box(row);
             }
             Ok(())

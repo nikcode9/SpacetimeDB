@@ -1,23 +1,23 @@
 use nonempty::NonEmpty;
 use parking_lot::{Mutex, MutexGuard};
-use spacetimedb_lib::{bsatn, ProductValue};
 use std::ops::DerefMut;
 use std::sync::Arc;
 
+use super::scheduler::{ScheduleError, ScheduledReducerId, Scheduler};
+use super::timestamp::Timestamp;
 use crate::database_instance_context::DatabaseInstanceContext;
 use crate::database_logger::{BacktraceProvider, LogLevel, Record};
 use crate::db::datastore::locking_tx_datastore::MutTxId;
-use crate::db::datastore::traits::{ColId, DataRow, IndexDef};
+use crate::db::datastore::traits::DataRow;
 use crate::error::{IndexError, NodesError};
 use crate::util::ResultInspectExt;
-
-use super::scheduler::{ScheduleError, ScheduledReducerId, Scheduler};
-use super::timestamp::Timestamp;
 use crate::vm::DbProgram;
 use spacetimedb_lib::filter::CmpArgs;
 use spacetimedb_lib::identity::AuthCtx;
 use spacetimedb_lib::operator::OpQuery;
-use spacetimedb_lib::relation::{FieldExpr, FieldName};
+use spacetimedb_lib::{bsatn, ProductValue};
+use spacetimedb_sats::db::def::{ColId, IndexDef, IndexType, TableId};
+use spacetimedb_sats::relation::{FieldExpr, FieldName};
 use spacetimedb_sats::{ProductType, Typespace};
 use spacetimedb_vm::expr::{Code, ColumnOp};
 
@@ -68,7 +68,7 @@ impl InstanceEnv {
         log::trace!("MOD({}): {}", self.dbic.address.to_abbreviated_hex(), record.message);
     }
 
-    pub fn insert(&self, table_id: u32, buffer: &[u8]) -> Result<ProductValue, NodesError> {
+    pub fn insert(&self, table_id: TableId, buffer: &[u8]) -> Result<ProductValue, NodesError> {
         let stdb = &*self.dbic.relational_db;
         let tx = &mut *self.get_tx()?;
 
@@ -78,7 +78,7 @@ impl InstanceEnv {
                 crate::error::DBError::Index(IndexError::UniqueConstraintViolation {
                     constraint_name: _,
                     table_name: _,
-                    col_names: _,
+                    cols: _,
                     value: _,
                 }) => {}
                 _ => {
@@ -144,7 +144,7 @@ impl InstanceEnv {
     ///
     /// Returns an error if no columns were deleted or if the column wasn't found.
     #[tracing::instrument(skip(self, value))]
-    pub fn delete_by_col_eq(&self, table_id: u32, col_id: u32, value: &[u8]) -> Result<u32, NodesError> {
+    pub fn delete_by_col_eq(&self, table_id: TableId, col_id: ColId, value: &[u8]) -> Result<u32, NodesError> {
         let stdb = &*self.dbic.relational_db;
         let tx = &mut *self.get_tx()?;
 
@@ -152,7 +152,7 @@ impl InstanceEnv {
         let eq_value = stdb.decode_column(tx, table_id, col_id, value)?;
 
         // Find all rows in the table where the column data equates to `value`.
-        let seek = stdb.iter_by_col_eq(tx, table_id, ColId(col_id), eq_value)?;
+        let seek = stdb.iter_by_col_eq(tx, table_id, col_id, eq_value)?;
         let seek = seek.map(|x| stdb.data_to_owned(x).into()).collect::<Vec<_>>();
 
         // Delete them and count how many we deleted and error if none.
@@ -234,7 +234,7 @@ impl InstanceEnv {
     ///
     /// Errors with `TableNotFound` if the table does not exist.
     #[tracing::instrument(skip_all)]
-    pub fn get_table_id(&self, table_name: String) -> Result<u32, NodesError> {
+    pub fn get_table_id(&self, table_name: String) -> Result<TableId, NodesError> {
         let stdb = &*self.dbic.relational_db;
         let tx = &mut *self.get_tx()?;
 
@@ -261,37 +261,36 @@ impl InstanceEnv {
     pub fn create_index(
         &self,
         index_name: String,
-        table_id: u32,
+        table_id: TableId,
         index_type: u8,
-        col_ids: Vec<u8>,
+        col_ids: Vec<ColId>,
     ) -> Result<(), NodesError> {
         let stdb = &*self.dbic.relational_db;
         let tx = &mut *self.get_tx()?;
 
         // TODO(george) This check should probably move towards src/db/index, but right
         // now the API is pretty hardwired towards btrees.
-        //
-        // TODO(george) Dedup the constant here.
+        let index_type = IndexType::try_from(index_type).map_err(|_| NodesError::BadIndexType(index_type))?;
+
         match index_type {
-            0 => (),
-            1 => todo!("Hash indexes not yet supported"),
-            _ => return Err(NodesError::BadIndexType(index_type)),
+            IndexType::BTree => {}
+            IndexType::Hash => {
+                todo!("Hash indexes not yet supported")
+            }
         };
 
-        let cols = NonEmpty::from_slice(&col_ids)
-            .expect("Attempt to create an index with zero columns")
-            .map(|x| x as u32);
+        let columns = NonEmpty::from_slice(&col_ids).expect("Attempt to create an index with zero columns");
 
-        let is_unique = stdb.column_attrs(tx, table_id, &cols)?.is_unique();
+        let is_unique = stdb.column_constraints(tx, table_id, &columns)?.has_unique();
 
         let index = IndexDef {
-            table_id,
-            cols,
-            name: index_name,
+            columns,
+            index_name,
             is_unique,
+            index_type,
         };
 
-        stdb.create_index(tx, index)?;
+        stdb.create_index(tx, table_id, index)?;
 
         Ok(())
     }
@@ -304,7 +303,7 @@ impl InstanceEnv {
     /// Matching is defined by decoding of `value` to an `AlgebraicValue`
     /// according to the column's schema and then `Ord for AlgebraicValue`.
     #[tracing::instrument(skip_all)]
-    pub fn iter_by_col_eq(&self, table_id: u32, col_id: u32, value: &[u8]) -> Result<Vec<u8>, NodesError> {
+    pub fn iter_by_col_eq(&self, table_id: TableId, col_id: ColId, value: &[u8]) -> Result<Vec<u8>, NodesError> {
         let stdb = &*self.dbic.relational_db;
         let tx = &mut *self.get_tx()?;
 
@@ -313,7 +312,7 @@ impl InstanceEnv {
 
         // Find all rows in the table where the column data matches `value`.
         // Concatenate and return these rows using bsatn encoding.
-        let results = stdb.iter_by_col_eq(tx, table_id, ColId(col_id), value)?;
+        let results = stdb.iter_by_col_eq(tx, table_id, col_id, value)?;
         let mut bytes = Vec::new();
         for result in results {
             bsatn::to_writer(&mut bytes, result.view()).unwrap();
@@ -322,7 +321,7 @@ impl InstanceEnv {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn iter(&self, table_id: u32) -> impl Iterator<Item = Result<Vec<u8>, NodesError>> {
+    pub fn iter(&self, table_id: TableId) -> impl Iterator<Item = Result<Vec<u8>, NodesError>> {
         use genawaiter::{sync::gen, yield_, GeneratorState};
 
         // Cheap Arc clones to untie the returned iterator from our own lifetime.
@@ -372,7 +371,7 @@ impl InstanceEnv {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn iter_filtered(&self, table_id: u32, filter: &[u8]) -> Result<impl Iterator<Item = Vec<u8>>, NodesError> {
+    pub fn iter_filtered(&self, table_id: TableId, filter: &[u8]) -> Result<impl Iterator<Item = Vec<u8>>, NodesError> {
         use spacetimedb_lib::filter;
 
         fn filter_to_column_op(table_name: &str, filter: filter::Expr) -> ColumnOp {
